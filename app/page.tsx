@@ -88,8 +88,11 @@ export default function Home() {
         setError(data.error ?? "Грешка при събиране.");
       } else {
         setMessage(
-          `Намерени ${data.collected}: ${data.added} нови, ${data.updated} обновени. Общо в базата: ${data.total}.`
+          `Претърсени ${data.combos} комбинации. Намерени ${data.collected}: ${data.added} нови, ${data.updated} обновени. Общо в базата: ${data.total}.`
         );
+        if (data.errors?.length) {
+          setError(`Пропуснати комбинации: ${data.errors.join(" · ")}`);
+        }
         await Promise.all([loadLeads(filters), loadStats()]);
       }
     } catch (e) {

@@ -154,7 +154,7 @@ function equalityKeys(f: FilterSpec): string[] {
   if (f.source) keys.push(`idx:source:${f.source}`);
   if (f.industry) keys.push(`idx:industry:${f.industry}`);
   if (f.status) keys.push(`idx:status:${f.status}`);
-  if (f.city) keys.push(`idx:city:${cityKey(f.city)}`);
+  // Град се филтрира по частичен текст в applyFilters (по-удобно от точно съвпадение).
   if (f.country) keys.push(`idx:country:${f.country.toUpperCase()}`);
   if (f.website === "with") keys.push("idx:has_website:1");
   if (f.website === "without") keys.push("idx:has_website:0");

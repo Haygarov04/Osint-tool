@@ -22,8 +22,12 @@ function haversineKm(
 // диапазони, радиус, соц. мрежи, верифициран имейл, ръчни изключвания.
 export function applyFilters(leads: Lead[], f: FilterSpec): Lead[] {
   const exclude = new Set((f.excludeDomains ?? []).map((d) => d.toLowerCase()));
+  const cityQuery = f.city?.trim().toLowerCase() ?? "";
 
   return leads.filter((l) => {
+    // Град: частично съвпадение (напр. "plov" -> "Plovdiv")
+    if (cityQuery && !l.city.toLowerCase().includes(cityQuery)) return false;
+
     if (f.ratingMin != null && (l.rating ?? 0) < f.ratingMin) return false;
     if (f.ratingMax != null && (l.rating ?? 0) > f.ratingMax) return false;
     if (f.reviewsMin != null && (l.reviewsCount ?? 0) < f.reviewsMin)
