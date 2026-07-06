@@ -27,12 +27,16 @@ export default function LeadTable({
   onGenerateMessage,
   generatingId,
   onSelectLead,
+  selectedIds,
+  onToggleSelect,
 }: {
   leads: Lead[];
   onUpdated?: () => void;
   onGenerateMessage?: (lead: Lead) => void;
   generatingId?: string | null;
   onSelectLead?: (lead: Lead) => void;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -65,6 +69,20 @@ export default function LeadTable({
       <table className="w-full text-sm">
         <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
           <tr>
+            <th className="w-8 px-2 py-2">
+              <input
+                type="checkbox"
+                onChange={(e) => {
+                  if (onToggleSelect) {
+                    if (e.target.checked) {
+                      leads.forEach(l => onToggleSelect(l.id));
+                    } else {
+                      // clear would be better handled in parent
+                    }
+                  }
+                }}
+              />
+            </th>
             <th className="px-3 py-2">Име</th>
             <th className="px-3 py-2">Категория</th>
             <th className="px-3 py-2">Телефон</th>
@@ -83,6 +101,13 @@ export default function LeadTable({
             const socialCount = [l.facebook, l.instagram, l.linkedin, l.youtube, l.tiktok].filter(Boolean).length;
             return (
               <tr key={l.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onSelectLead?.(l)}>
+                <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds?.includes(l.id) || false}
+                    onChange={() => onToggleSelect?.(l.id)}
+                  />
+                </td>
                 <td className="px-3 py-2 font-medium max-w-[220px] truncate text-blue-700 hover:underline" title={l.name}>{l.name}</td>
                 <td className="px-3 py-2 text-slate-500">{l.category}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{l.phone || "—"}</td>

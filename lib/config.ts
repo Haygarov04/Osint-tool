@@ -9,6 +9,7 @@ export const config = {
   // Учтив User-Agent — Nominatim/Overpass изискват идентификация.
   userAgent: "OsintLeadTool/0.1 (+https://github.com/Haygarov04/Osint-tool)",
   xaiApiKey: process.env.XAI_API_KEY ?? "",
+  sitePassword: process.env.SITE_PASSWORD ?? "",
 };
 
 // Vercel/Upstash интеграцията понякога дава UPSTASH_*, понякога KV_* имена —
@@ -35,4 +36,12 @@ export function hasGoogle(): boolean {
 
 export function hasXai(): boolean {
   return Boolean(config.xaiApiKey);
+}
+
+export function hasSitePassword(): boolean {
+  return Boolean(config.sitePassword);
+}
+
+export function getSitePassword(): string {
+  return config.sitePassword;
 }

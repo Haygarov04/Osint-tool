@@ -279,6 +279,16 @@ export async function queryLeads(f: FilterSpec): Promise<QueryResult> {
   else if (keys.length > 1) ids = await redis.sinter(keys[0], ...keys.slice(1));
   else ids = await redis.smembers(ALL);
 
+  // Folder filtering (email-like saved lists)
+  if (f.folder) {
+    const folderIds = await redis.smembers(`folder:${f.folder}`);
+    if (folderIds.length > 0) {
+      ids = ids.filter((id) => folderIds.includes(id));
+    } else {
+      ids = [];
+    }
+  }
+
   if (ids.length === 0) return { leads: [], total: 0 };
 
   let leads = await mgetLeads(ids);
@@ -352,4 +362,43 @@ export async function getStats(): Promise<StatsResult> {
     withEmail: await redis.scard("idx:has_email:1"),
     enrichable: enrichIds.length,
   };
+}
+
+// ==================== FOLDERS (Email-like saved lists) ====================
+
+const FOLDERS_ALL = "folders:all";
+
+export async function listFolders(): Promise<string[]> {
+  const redis = getRedis();
+  return (await redis.smembers(FOLDERS_ALL)) || [];
+}
+
+export async function createFolder(name: string): Promise<void> {
+  const redis = getRedis();
+  const clean = name.trim();
+  if (!clean) return;
+  await redis.sadd(FOLDERS_ALL, clean);
+}
+
+export async function addLeadsToFolder(folder: string, leadIds: string[]): Promise<void> {
+  const redis = getRedis();
+  if (!folder || leadIds.length === 0) return;
+  await redis.sadd(`folder:${folder}`, leadIds);
+}
+
+export async function removeLeadsFromFolder(folder: string, leadIds: string[]): Promise<void> {
+  const redis = getRedis();
+  if (!folder || leadIds.length === 0) return;
+  await redis.srem(`folder:${folder}`, leadIds);
+}
+
+export async function getLeadIdsInFolder(folder: string): Promise<string[]> {
+  const redis = getRedis();
+  return (await redis.smembers(`folder:${folder}`)) || [];
+}
+
+export async function deleteFolder(folder: string): Promise<void> {
+  const redis = getRedis();
+  await redis.srem(FOLDERS_ALL, folder);
+  await redis.del(`folder:${folder}`);
 }

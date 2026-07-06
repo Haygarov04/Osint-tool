@@ -107,6 +107,12 @@ export default function Home() {
   // CRM Modal
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
+  // Folders (email-like)
+  const [folders, setFolders] = useState<string[]>([]);
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [k]: v }));
 
@@ -120,7 +126,11 @@ export default function Home() {
 
   const loadLeads = useCallback(async (f: Filters) => {
     setError(null);
-    const res = await fetch(`/api/leads?${buildQuery(f)}&limit=300`);
+    let query = buildQuery(f);
+    if (currentFolder) {
+      query += (query ? "&" : "") + `folder=${encodeURIComponent(currentFolder)}`;
+    }
+    const res = await fetch(`/api/leads?${query}&limit=300`);
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? "Грешка при зареждане.");
@@ -128,17 +138,26 @@ export default function Home() {
     }
     setLeads(data.leads);
     setTotal(data.total);
-  }, []);
+  }, [currentFolder]);
 
   const loadStats = useCallback(async () => {
     const res = await fetch("/api/stats");
     if (res.ok) setStats(await res.json());
   }, []);
 
+  const loadFolders = useCallback(async () => {
+    const res = await fetch("/api/folders");
+    if (res.ok) {
+      const data = await res.json();
+      setFolders(data.folders || []);
+    }
+  }, []);
+
   useEffect(() => {
     loadLeads(EMPTY_FILTERS).catch(() => {});
     loadStats().catch(() => {});
-  }, [loadLeads, loadStats]);
+    loadFolders().catch(() => {});
+  }, [loadLeads, loadStats, loadFolders]);
 
   async function collect(p: CollectParams) {
     setBusy(true);
@@ -166,6 +185,21 @@ export default function Home() {
       setError(e instanceof Error ? e.message : "Мрежова грешка.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Folder navigation (email style)
+  async function switchFolder(folder: string | null) {
+    setCurrentFolder(folder);
+    const newFilters = { ...filters };
+    // We will pass folder via query
+    const query = buildQuery(newFilters);
+    const folderParam = folder ? `&folder=${encodeURIComponent(folder)}` : "";
+    const res = await fetch(`/api/leads?${query}${folderParam}&limit=300`);
+    const data = await res.json();
+    if (res.ok) {
+      setLeads(data.leads || []);
+      setTotal(data.total || 0);
     }
   }
 
@@ -256,14 +290,48 @@ export default function Home() {
     setTimeout(() => setMessage(null), 1500);
   }
 
+  // Save selected leads to a folder (email-like)
+  async function saveSelectedToFolder(folder: string) {
+    if (selectedLeadIds.length === 0) return;
+    await fetch("/api/folders/membership", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder, leadIds: selectedLeadIds, action: "add" }),
+    });
+    setMessage(`Запазени ${selectedLeadIds.length} лийда в "${folder}"`);
+    setSelectedLeadIds([]);
+    await loadFolders();
+  }
+
+  async function createNewFolder() {
+    if (!newFolderName.trim()) return;
+    await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newFolderName.trim() }),
+    });
+    setNewFolderName("");
+    await loadFolders();
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">OSINT Lead Tool</h1>
-        <p className="text-sm text-slate-500">
-          Събиране на лийдове от OSM + Google Places • Обогатяване с имейли/соц/сигнали за сайта • Филтри + статус • CSV експорт.
-          Перфектно за B2B услуги (сайтове, SEO, услуги) — таргетирай "без сайт" или "стар сайт".
-        </p>
+      <header className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">OSINT Lead Tool</h1>
+          <p className="text-sm text-slate-500">
+            Събиране на лийдове • CRM с папки • AI анализи с Grok • Защитен с парола
+          </p>
+        </div>
+        <button
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" });
+            window.location.href = "/login";
+          }}
+          className="text-xs text-slate-500 hover:text-red-600"
+        >
+          Изход
+        </button>
       </header>
 
       <section className="mb-4">
@@ -284,6 +352,54 @@ export default function Home() {
       <section className="mb-4">
         <StatsBar stats={stats} />
       </section>
+
+      {/* Folders - Email-like saved lists */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+        <span className="font-medium text-slate-600 mr-1">Папки:</span>
+
+        <button
+          onClick={() => switchFolder(null)}
+          className={`rounded px-3 py-1 ${!currentFolder ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
+        >
+          Всички
+        </button>
+
+        {folders.map((f) => (
+          <button
+            key={f}
+            onClick={() => switchFolder(f)}
+            className={`rounded px-3 py-1 ${currentFolder === f ? "bg-blue-600 text-white" : "hover:bg-blue-50"}`}
+          >
+            📁 {f}
+          </button>
+        ))}
+
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Нова папка..."
+            className="w-40 rounded border px-2 py-1 text-sm"
+            onKeyDown={(e) => { if (e.key === "Enter") createNewFolder(); }}
+          />
+          <button onClick={createNewFolder} className="rounded bg-slate-800 px-3 py-1 text-white text-sm">Създай</button>
+        </div>
+      </div>
+
+      {/* Bulk actions bar (email style) */}
+      {selectedLeadIds.length > 0 && (
+        <div className="mb-3 flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
+          <span>Избрани: <strong>{selectedLeadIds.length}</strong></span>
+          <button onClick={() => setSelectedLeadIds([])} className="text-blue-600 underline">Откажи</button>
+
+          <div className="ml-4 flex gap-1">
+            {folders.map(f => (
+              <button key={f} onClick={() => saveSelectedToFolder(f)} className="rounded border px-2 py-0.5 text-xs hover:bg-white">Запази в {f}</button>
+            ))}
+          </div>
+          <button onClick={() => setSelectedLeadIds([])} className="ml-auto text-xs text-red-600">Изчисти избор</button>
+        </div>
+      )}
 
       {/* Обогатяване */}
       <section className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
@@ -555,6 +671,12 @@ export default function Home() {
         onGenerateMessage={generateAiMessage}
         generatingId={aiGeneratingFor}
         onSelectLead={setSelectedLead}
+        selectedIds={selectedLeadIds}
+        onToggleSelect={(id) => {
+          setSelectedLeadIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+          );
+        }}
       />
 
       {/* AI Message Modal (global quick one) */}

@@ -136,6 +136,9 @@ export interface FilterSpec {
   // разбивка на страници
   limit?: number;
   offset?: number;
+
+  // папки (email-like)
+  folder?: string;
 }
 
 export interface StatsResult {

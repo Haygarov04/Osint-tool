@@ -48,5 +48,6 @@ export function parseFilter(sp: URLSearchParams): FilterSpec {
     sortDir: sortDir === "asc" || sortDir === "desc" ? sortDir : undefined,
     limit: num("limit"),
     offset: num("offset"),
+    folder: sp.get("folder") || undefined,
   };
 }
