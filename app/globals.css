@@ -7,5 +7,31 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-[#f4f0ff] text-slate-900 antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Premium Apple-like styles matching reference */
+.lead-card {
+  @apply bg-white rounded-3xl shadow-sm border border-slate-100 transition-all hover:shadow-md p-4 flex items-start gap-4;
+}
+
+.status-pill {
+  @apply px-2.5 py-0.5 text-xs font-medium rounded-full;
+}
+
+.apple-input {
+  @apply bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus:border-violet-300 focus:ring-1 focus:ring-violet-200;
+}
+
+.filter-pill {
+  @apply px-4 py-1 rounded-full text-sm border transition-all hover:bg-white bg-white/70;
+}
+
+.filter-pill.active {
+  @apply bg-white shadow-sm border-slate-300;
+}
+
+.sidebar-card {
+  @apply bg-white rounded-3xl p-5 shadow-sm border border-white/60;
 }

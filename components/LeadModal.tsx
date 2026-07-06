@@ -67,7 +67,7 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
     }
   };
 
-  // По-добър анализ с Grok (само при клик)
+  // По-добър анализ с Grok (само при клик) - fixed to always work and show result or error
   const runAnalysis = async () => {
     setAnalysisBusy(true);
     try {
@@ -80,7 +80,11 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
       if (res.ok && data.lead) {
         setCurrent(data.lead);
         onUpdated(data.lead);
+      } else {
+        alert(data.error || "Грешка при анализ с Grok. Провери XAI_API_KEY и опитай пак.");
       }
+    } catch (err) {
+      alert("Не успя да се свърже с xAI. Провери ключа и интернет.");
     } finally {
       setAnalysisBusy(false);
     }
