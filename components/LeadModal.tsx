@@ -10,9 +10,10 @@ interface Props {
   onClose: () => void;
   onUpdated: (updatedLead: Lead) => void;
   aiOffer: string;
+  onDelete?: () => void;
 }
 
-export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) {
+export default function LeadModal({ lead, onClose, onUpdated, aiOffer, onDelete }: Props) {
   const [current, setCurrent] = useState(lead);
   const [busy, setBusy] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -21,6 +22,7 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
   const [generated, setGenerated] = useState<{ subject: string; body: string } | null>(null);
   const [notes, setNotes] = useState(lead.notes || "");
   const [tags, setTags] = useState((lead.tags || []).join(", "));
+  const [messageOffer, setMessageOffer] = useState(aiOffer);
 
   const updateField = async (patch: Partial<Lead>) => {
     setBusy(true);
@@ -50,16 +52,18 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
 
   // Генерирай AI съобщение (в модала)
   const generateMessage = async () => {
-    if (!aiOffer.trim()) {
-      alert("Първо въведи офертата си в главния екран.");
+    const offerToUse = messageOffer.trim() || aiOffer.trim();
+    if (!offerToUse) {
+      setAnalysisError("Моля, въведи офертата си по-горе (напр. 'Модерен уеб сайт + SEO').");
       return;
     }
     setMessageBusy(true);
+    setAnalysisError(null);
     try {
       const res = await fetch("/api/ai/generate-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId: current.id, offer: aiOffer }),
+        body: JSON.stringify({ leadId: current.id, offer: offerToUse }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -120,6 +124,18 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
   };
 
   const copy = (text: string) => navigator.clipboard.writeText(text);
+
+  const deleteLead = async () => {
+    if (!confirm(`Изтрий ${current.name}? Това е необратимо.`)) return;
+    setBusy(true);
+    try {
+      await fetch(`/api/leads?id=${current.id}`, { method: "DELETE" });
+      onDelete?.();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -247,6 +263,15 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
 
           {/* AI Email Composer */}
           <div className="rounded-xl border border-violet-200 p-4 bg-violet-50">
+            <div className="mb-2">
+              <label className="text-xs font-medium text-violet-700">Вашата оферта / услуга (за персонализирано съобщение)</label>
+              <input
+                className="mt-1 w-full rounded border border-violet-300 bg-white px-2 py-1 text-xs"
+                value={messageOffer}
+                onChange={e => setMessageOffer(e.target.value)}
+                placeholder="напр. Модерен уеб сайт + SEO за локални бизнеси"
+              />
+            </div>
             <div className="flex items-center justify-between mb-2">
               <div className="font-semibold text-violet-900">✨ AI Съобщение</div>
               <button
@@ -281,7 +306,7 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
             <button onClick={deepEnrich} disabled={busy} className="px-3 py-1.5 text-sm rounded border hover:bg-slate-100">Deep Enrich (имейл + социални)</button>
             <button onClick={() => copy(current.phone || "")} className="px-3 py-1.5 text-sm rounded border">Копирай телефон</button>
             <button onClick={() => copy(current.email || "")} className="px-3 py-1.5 text-sm rounded border">Копирай имейл</button>
-            <button onClick={() => { if (confirm("Изтрий този лийд?")) { /* simple delete */ alert("Изтриване на единичен лийд може да се добави лесно"); } }} className="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600">Изтрий лийда</button>
+            <button onClick={deleteLead} className="px-3 py-1.5 text-sm rounded border border-red-300 text-red-600">Изтрий лийда</button>
           </div>
 
           <div className="text-[10px] text-slate-400">

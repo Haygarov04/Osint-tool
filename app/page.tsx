@@ -126,7 +126,8 @@ export default function Home() {
 
   // Premium filtered leads (with search) - must be after all useState
   const filteredLeads = leads.filter(l => {
-    const matchesFolder = !currentFolder || (l as any).folder === currentFolder;
+    // folder filtering is handled server-side when loading with folder param
+    const matchesFolder = true;
     const matchesStatus = activeStatusFilter === 'all' || l.status === activeStatusFilter;
     const matchesSource = selectedSource === 'all' || l.source === selectedSource;
     const q = searchTerm.toLowerCase();
@@ -790,6 +791,10 @@ export default function Home() {
             setSelectedLead(updated);
           }}
           aiOffer={aiOffer}
+          onDelete={() => {
+            loadLeads(filters);
+            loadFolders();
+          }}
         />
       )}
 

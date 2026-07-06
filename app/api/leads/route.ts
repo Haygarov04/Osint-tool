@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryLeads, updateLeadFields } from "@/lib/storage/repository";
+import { queryLeads, updateLeadFields, deleteLead } from "@/lib/storage/repository";
 import { parseFilter } from "@/lib/filters/parse";
 
 export const runtime = "nodejs";
@@ -38,6 +38,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Лийдът не е намерен." }, { status: 404 });
     }
     return NextResponse.json({ lead: updated });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Неочаквана грешка." },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/leads?id=xxx
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "id е задължително." }, { status: 400 });
+    }
+    await deleteLead(id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Неочаквана грешка." },

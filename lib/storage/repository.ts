@@ -455,3 +455,20 @@ export async function moveLeadsToFolder(leadIds: string[], toFolder: string, fro
   // Make sure target folder exists
   await redis.sadd(FOLDERS_ALL, toFolder);
 }
+
+export async function deleteLead(id: string): Promise<void> {
+  const redis = getRedis();
+  const lead = await redis.get<Lead>(leadKey(id));
+  if (!lead) return;
+
+  const p = redis.pipeline();
+  // remove from status index
+  p.srem(`idx:status:${lead.status}`, id);
+  // remove from all folders (best effort)
+  const allFolders = await redis.smembers(FOLDERS_ALL);
+  for (const f of allFolders) {
+    p.srem(`folder:${f}`, id);
+  }
+  p.del(leadKey(id));
+  await p.exec();
+}
