@@ -488,7 +488,7 @@ export default function Home() {
       )}
 
       {/* Full Premium Layout matching the reference image + Maltego features */}
-      <div>
+      <div className="flex gap-6">
         {/* LEFT SIDEBAR: Filters + Folders + New Folder + Transforms */}
         <div className="w-72 shrink-0 space-y-4">
           <div className="sidebar-card">
@@ -795,31 +795,7 @@ export default function Home() {
             Свали CSV
           </a>
 
-      {/* Old filter UI removed - new sidebar is active */}
-
-      {/* Clean cards below - no old table text */}
-      {/* Top like the image: Search + Status pills */}
-      <div className="mb-4">
-        <input 
-          type="text" 
-          placeholder="Search leads — name, phone, city, website..." 
-          className="w-full apple-input text-base mb-3" 
-        />
-        <div className="flex flex-wrap gap-2">
-          {['All','new','processed','contacted','replied','customer','unsubscribed'].map((s,i) => (
-            <button key={i} onClick={() => setActiveStatusFilter(s === 'All' ? 'all' : s)} className={`px-4 py-1 rounded-full text-sm border ${activeStatusFilter === (s==='All'?'all':s) ? 'bg-white shadow' : 'bg-white/70'}`}>
-              {s} <span className="text-xs opacity-60">({s==='All' ? (stats?.total||0) : (stats?.byStatus?.[s as any]||0)})</span>
-            </button>
-          ))}
-          <button onClick={() => setViewMode(viewMode==='list'?'kanban':'list')} className="ml-auto px-3 py-1 rounded-full border bg-white text-sm">
-            {viewMode==='list' ? 'Kanban' : 'List'}
-          </button>
-          <button onClick={() => setShowGraph(true)} className="px-3 py-1 rounded-full border bg-white text-sm">🕸️ Graph (Maltego)</button>
-        </div>
-      </div>
-
-      {/* Leads rendered in the main flex above with beautiful cards. */}
-      {/* flex closes handled */}
+      {/* Top search + pills + cards are below in the flex layout */}
 
       {/* AI Message Modal (global quick one) */}
       {generatedMessage && (
