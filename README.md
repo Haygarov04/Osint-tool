@@ -1,35 +1,43 @@
 # OSINT Lead Tool
 
 Универсална B2B/локална система за генериране на лийдове и (по-късно) аутрийч.
-Намира бизнеси по локация + индустрия, нормализира ги в стандартен `Lead`, пази ги
-в **Upstash Redis**, филтрира комбинируемо и експортира CSV.
+Намира бизнеси по локация + индустрия (OSM + Google), нормализира в стандартен `Lead`,
+съхранява в **Upstash Redis**, филтрира комбинируемо, обогатява от сайта (имейл, телефон, соц, tech, SSL/мобилен/стар), и експортира CSV.
 
 Стек: **Next.js (App Router) + TypeScript + Tailwind**, база **Upstash Redis**,
 деплой на **Vercel**.
 
-## Какво прави тази версия (Фаза 1 + старт на Фаза 2)
+## Какво прави тази версия (Фаза 1 + 2 + частично 3)
 
-- Източник **OSM / Overpass** (безплатно, по подразбиране).
-- Източник **Google Places** (зад `GOOGLE_MAPS_API_KEY`).
-- Стандартизиран `Lead` модел + съхранение в Upstash с дедупликация.
-- Комбинируеми филтри: гео, индустрия, без/със сайт, контакти, качество, статус.
-- CSV експорт.
-- Просто уеб UI за търсене, филтриране и сваляне.
+- Източници: **OSM/Overpass** (безплатно) + **Google Places** (опционално).
+- Стандартизиран `Lead` + дедуп (домейн / телефон / име+адрес) + merge.
+- Богати филтри в UI + API: сайт (без/със/стар/без SSL/немобилен), контакти, качество, тех стек, град, сортиране и др.
+- Обогатяване: scrape на сайта → имейл + телефон + соц. профили + tech + SSL/mobile/outdated сигнали + MX verify.
+- Интерактивна таблица: смяна на статус директно.
+- CSV експорт с текущите филтри.
+- Статистики + batch обогатяване с пауза.
 
-Следващите фази (имейл enrichment, dashboard, аутрийч, аналитика) са скицирани в
-`lib/enrichment/` и `lib/outreach/`.
+Следващи фази (скицирани):
+- По-силно обогатяване (3rd party APIs)
+- Сегменти / черен списък / bulk действия
+- Автоматичен аутрийч (Фаза 5)
+
+Модулна структура — лесно добавяне на източник или филтър.
 
 ## Локален старт
 
 ```bash
 npm install
-cp .env.example .env.local     # попълни UPSTASH_* (и по избор GOOGLE_MAPS_API_KEY)
+cp .env.example .env.local     # задължително UPSTASH_REDIS_REST_URL + TOKEN
 npm run dev                    # http://localhost:3000
 ```
 
-За `UPSTASH_*` стойностите: направи безплатна Redis база в
-[Upstash](https://upstash.com) (или добави storage-а във Vercel — виж по-долу) и
-копирай REST URL + TOKEN.
+**Важно:** Приложението изисква Upstash Redis (безплатен tier е достатъчен). Без него няма да тръгне.
+
+1. Регистрирай се на https://upstash.com → Create database (REST) → копирай URL + TOKEN.
+2. (Опционално) Създай Google Maps API ключ + активирай Places API в Google Cloud Console.
+
+След като събереш лийдове, можеш да филтрираш по "стар сайт", "без сайт", "има телефон" и т.н. и да сваляш CSV.
 
 ### Пример за ползване
 
@@ -39,13 +47,13 @@ npm run dev                    # http://localhost:3000
 
 ## Деплой на Vercel
 
-1. `git push` към GitHub repo-то.
-2. Vercel → **Import** repo-то.
-3. Vercel → **Storage** → добави **Upstash Redis** към проекта — `UPSTASH_REDIS_REST_URL`
-   и `UPSTASH_REDIS_REST_TOKEN` се добавят автоматично.
-4. Vercel → **Settings → Environment Variables** → добави `GOOGLE_MAPS_API_KEY`
-   (по избор, ако ще ползваш Google източника).
-5. **Deploy**.
+1. `git push` към GitHub.
+2. Vercel → Import repo.
+3. Vercel → **Storage** tab → добави **Upstash Redis** (безплатно) — ключовете се инжектират автоматично.
+4. (опционално) Добави `GOOGLE_MAPS_API_KEY` в Settings → Environment Variables.
+5. Deploy.
+
+След deploy, отвори приложението и започни със събиране (напр. "Plovdiv", ресторанти).
 
 ## Структура
 

@@ -20,6 +20,12 @@ interface Filters {
   hasEmail: boolean;
   emailVerified: boolean;
   hasSocial: boolean;
+  siteOutdated: boolean;
+  noSsl: boolean;
+  notMobile: boolean;
+  tech: string;
+  sortBy: string;
+  sortDir: string;
 }
 
 const EMPTY_FILTERS: Filters = {
@@ -35,6 +41,12 @@ const EMPTY_FILTERS: Filters = {
   hasEmail: false,
   emailVerified: false,
   hasSocial: false,
+  siteOutdated: false,
+  noSsl: false,
+  notMobile: false,
+  tech: "",
+  sortBy: "quality",
+  sortDir: "desc",
 };
 
 const STATUSES: [string, string][] = [
@@ -60,6 +72,12 @@ function buildQuery(f: Filters): string {
   if (f.hasEmail) sp.set("hasEmail", "true");
   if (f.emailVerified) sp.set("emailVerified", "true");
   if (f.hasSocial) sp.set("hasSocial", "true");
+  if (f.siteOutdated) sp.set("siteOutdated", "true");
+  if (f.noSsl) sp.set("noSsl", "true");
+  if (f.notMobile) sp.set("notMobile", "true");
+  if (f.tech) sp.set("tech", f.tech);
+  if (f.sortBy) sp.set("sortBy", f.sortBy);
+  if (f.sortDir) sp.set("sortDir", f.sortDir);
   return sp.toString();
 }
 
@@ -171,8 +189,8 @@ export default function Home() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold">OSINT Lead Tool</h1>
         <p className="text-sm text-slate-500">
-          Намиране на бизнеси от OpenStreetMap и Google Places, обогатяване с
-          имейли, филтриране и експорт.
+          Събиране на лийдове от OSM + Google Places • Обогатяване с имейли/соц/сигнали за сайта • Филтри + статус • CSV експорт.
+          Перфектно за B2B услуги (сайтове, SEO, услуги) — таргетирай "без сайт" или "стар сайт".
         </p>
       </header>
 
@@ -292,6 +310,15 @@ export default function Home() {
           />
         </Field>
 
+        <Field label="Tech (напр. WordPress)">
+          <input
+            className="w-28 rounded border border-slate-300 px-2 py-1.5"
+            placeholder="WordPress"
+            value={filters.tech}
+            onChange={(e) => set("tech", e.target.value)}
+          />
+        </Field>
+
         <Check
           label="има телефон"
           checked={filters.hasPhone}
@@ -313,7 +340,47 @@ export default function Home() {
           onChange={(v) => set("hasSocial", v)}
         />
 
-        <div className="ml-auto flex gap-2">
+        <Check
+          label="стар сайт"
+          checked={filters.siteOutdated}
+          onChange={(v) => set("siteOutdated", v)}
+        />
+        <Check
+          label="без SSL"
+          checked={filters.noSsl}
+          onChange={(v) => set("noSsl", v)}
+        />
+        <Check
+          label="немобилен"
+          checked={filters.notMobile}
+          onChange={(v) => set("notMobile", v)}
+        />
+
+        <div className="ml-auto flex flex-wrap items-end gap-2">
+          <Field label="Сортирай">
+            <select
+              className="rounded border border-slate-300 px-2 py-1.5"
+              value={filters.sortBy}
+              onChange={(e) => set("sortBy", e.target.value)}
+            >
+              <option value="quality">Качество</option>
+              <option value="rating">Рейтинг</option>
+              <option value="reviews">Ревюта</option>
+              <option value="created">Дата</option>
+              <option value="name">Име</option>
+            </select>
+          </Field>
+          <Field label="Посока">
+            <select
+              className="rounded border border-slate-300 px-2 py-1.5"
+              value={filters.sortDir}
+              onChange={(e) => set("sortDir", e.target.value)}
+            >
+              <option value="desc">Низх. ↓</option>
+              <option value="asc">Възх. ↑</option>
+            </select>
+          </Field>
+
           <button
             onClick={() => loadLeads(filters)}
             className="h-9 rounded bg-slate-800 px-4 font-medium text-white hover:bg-slate-900"
@@ -341,7 +408,7 @@ export default function Home() {
       <div className="mb-2 text-sm text-slate-500">
         Показани {leads.length} от {total} съвпадащи.
       </div>
-      <LeadTable leads={leads} />
+      <LeadTable leads={leads} onUpdated={() => loadLeads(filters)} />
     </main>
   );
 }

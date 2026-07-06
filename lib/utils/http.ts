@@ -14,6 +14,31 @@ interface FetchOpts {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Сваля страница и връща HTML + крайния URL след пренасочвания (за SSL детекция).
+export async function fetchPage(
+  url: string,
+  { timeoutMs = 10000 }: { timeoutMs?: number } = {}
+): Promise<{ html: string; finalUrl: string } | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": config.userAgent,
+        Accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return { html: await res.text(), finalUrl: res.url || url };
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
 // Сваля суров текст/HTML (за скролване на сайтове). Кратък таймаут, 1 повторение.
 export async function fetchText(
   url: string,

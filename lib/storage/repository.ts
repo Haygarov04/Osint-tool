@@ -140,6 +140,14 @@ function newLeadRecord(item: NewLead, domain: string): Lead {
     ...item,
     id: randomUUID(),
     domain,
+    hasSsl: false,
+    mobileFriendly: false,
+    siteOutdated: false,
+    techStack: [],
+    description: "",
+    youtube: "",
+    tiktok: "",
+    notes: "",
     qualityScore: 0,
     enrichedAt: null,
     createdAt: now,
@@ -185,6 +193,48 @@ export async function saveEnriched(
   for (const k of leadIndexKeys(merged)) p.sadd(k, merged.id);
   await p.exec();
   return merged;
+}
+
+// Обновява CRM полета на един лийд (статус/бележки/тагове) и преиндексира статуса.
+export async function updateLeadFields(
+  id: string,
+  patch: Partial<Pick<Lead, "status" | "notes" | "tags">>
+): Promise<Lead | null> {
+  const redis = getRedis();
+  const old = await redis.get<Lead>(leadKey(id));
+  if (!old) return null;
+
+  const statusChanged = Boolean(patch.status && patch.status !== old.status);
+  const merged: Lead = { ...old, ...patch, updatedAt: Date.now() };
+
+  const p = redis.pipeline();
+  if (statusChanged) {
+    p.srem(`idx:status:${old.status}`, id);
+    p.sadd(`idx:status:${merged.status}`, id);
+  }
+  p.set(leadKey(id), merged);
+  await p.exec();
+  return merged;
+}
+
+// Изтрива всички лийдове, съвпадащи с филтъра (за чистене на стари/ненужни записи).
+export async function deleteByFilter(f: FilterSpec): Promise<number> {
+  const redis = getRedis();
+  const { leads } = await queryLeads({ ...f, limit: 1000000, offset: 0 });
+  if (leads.length === 0) return 0;
+
+  const p = redis.pipeline();
+  for (const l of leads) {
+    for (const k of leadIndexKeys(l)) p.srem(k, l.id);
+    p.srem(ALL, l.id);
+    p.del(leadKey(l.id));
+    if (l.domain) p.del(`dedup:domain:${l.domain}`);
+    const phone = normalizePhone(l.phone);
+    if (phone) p.del(`dedup:phone:${phone}`);
+    p.del(`dedup:nameaddr:${nameAddrKey(l.name, l.address)}`);
+  }
+  await p.exec();
+  return leads.length;
 }
 
 // Кои равенствени индекси да пресечем спрямо филтъра.
@@ -243,11 +293,33 @@ export async function queryLeads(f: FilterSpec): Promise<QueryResult> {
     (l) => !(l.domain && blD.has(l.domain)) && !(l.email && blE.has(l.email))
   );
 
-  // остатъчни филтри (диапазони, радиус, соц., ръчни изключвания)
+  // остатъчни филтри (диапазони, радиус, соц., сайт, възраст, ръчни изключвания)
   leads = applyFilters(leads, f);
 
-  // сортиране: най-новите отгоре
-  leads.sort((a, b) => b.createdAt - a.createdAt);
+  // сортиране
+  const dir = f.sortDir === "asc" ? 1 : -1;
+  const val = (l: Lead): number | string => {
+    switch (f.sortBy) {
+      case "rating":
+        return l.rating ?? 0;
+      case "reviews":
+        return l.reviewsCount ?? 0;
+      case "quality":
+        return l.qualityScore;
+      case "name":
+        return l.name.toLowerCase();
+      default:
+        return l.createdAt;
+    }
+  };
+  leads.sort((a, b) => {
+    const av = val(a);
+    const bv = val(b);
+    if (typeof av === "string" || typeof bv === "string") {
+      return String(av).localeCompare(String(bv)) * dir;
+    }
+    return (av - bv) * dir;
+  });
 
   const total = leads.length;
   const offset = f.offset ?? 0;

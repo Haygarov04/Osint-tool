@@ -23,10 +23,25 @@ function haversineKm(
 export function applyFilters(leads: Lead[], f: FilterSpec): Lead[] {
   const exclude = new Set((f.excludeDomains ?? []).map((d) => d.toLowerCase()));
   const cityQuery = f.city?.trim().toLowerCase() ?? "";
+  const tech = f.tech?.trim().toLowerCase() ?? "";
+  const olderThan =
+    f.olderThanDays != null
+      ? Date.now() - f.olderThanDays * 86400000
+      : null;
 
   return leads.filter((l) => {
     // Град: частично съвпадение (напр. "plov" -> "Plovdiv")
     if (cityQuery && !l.city.toLowerCase().includes(cityQuery)) return false;
+
+    // състояние на сайта
+    if (f.siteOutdated && !(l.siteOutdated ?? false)) return false;
+    if (f.noSsl && (l.hasSsl ?? false)) return false;
+    if (f.notMobile && (l.mobileFriendly ?? false)) return false;
+    if (tech && !(l.techStack ?? []).some((t) => t.toLowerCase() === tech))
+      return false;
+
+    // възраст (за чистене на стари записи)
+    if (olderThan != null && l.createdAt > olderThan) return false;
 
     if (f.ratingMin != null && (l.rating ?? 0) < f.ratingMin) return false;
     if (f.ratingMax != null && (l.rating ?? 0) > f.ratingMax) return false;

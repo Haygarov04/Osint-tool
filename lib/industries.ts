@@ -109,6 +109,30 @@ export const INDUSTRIES: IndustryDef[] = [
     osm: [["shop", "florist"]],
     google: ["florist"],
   },
+  {
+    key: "accountant",
+    label: "Счетоводител / Счетоводни услуги",
+    osm: [["office", "accountant"], ["shop", "accountant"]],
+    google: ["accounting"],
+  },
+  {
+    key: "plumber",
+    label: "Водопроводчик / Отопление",
+    osm: [["craft", "plumber"]],
+    google: ["plumber"],
+  },
+  {
+    key: "electrician",
+    label: "Електротехник",
+    osm: [["craft", "electrician"]],
+    google: ["electrician"],
+  },
+  {
+    key: "photographer",
+    label: "Фотограф / Студио",
+    osm: [["craft", "photographer"]],
+    google: ["photographer"],
+  },
 ];
 
 export function getIndustry(key: string): IndustryDef | undefined {

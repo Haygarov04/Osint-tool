@@ -31,9 +31,18 @@ export interface Lead {
   hasWebsite: boolean;
   domain: string; // извлечен от website (без www)
 
+  // сигнали за състоянието на сайта (попълват се при обогатяване)
+  hasSsl: boolean; // сайтът се обслужва по https
+  mobileFriendly: boolean; // има <meta viewport>
+  siteOutdated: boolean; // евристика: без SSL / немобилен / стари технологии
+  techStack: string[]; // засечени технологии (WordPress, Wix, jQuery…)
+  description: string; // meta description / og:description (бизнес профил)
+
   facebook: string;
   instagram: string;
   linkedin: string;
+  youtube: string;
+  tiktok: string;
 
   address: string;
   city: string;
@@ -49,6 +58,7 @@ export interface Lead {
   qualityScore: number; // 0..100
   tags: string[];
   status: LeadStatus;
+  notes: string; // CRM бележки
 
   enrichedAt: number | null; // кога е правен опит за обогатяване (имейл/соц.)
   createdAt: number; // unix ms
@@ -64,6 +74,14 @@ export type NewLead = Omit<
   | "updatedAt"
   | "domain"
   | "enrichedAt"
+  | "hasSsl"
+  | "mobileFriendly"
+  | "siteOutdated"
+  | "techStack"
+  | "description"
+  | "youtube"
+  | "tiktok"
+  | "notes"
 > & { domain?: string };
 
 // Комбинируеми филтри (секция 5 от спецификацията).
@@ -96,8 +114,21 @@ export interface FilterSpec {
   reviewsMin?: number;
   qualityMin?: number;
 
+  // състояние на сайта
+  siteOutdated?: boolean; // стар сайт (таргет за редизайн)
+  noSsl?: boolean; // без https
+  notMobile?: boolean; // немобилен
+  tech?: string; // засечена технология (напр. "WordPress")
+
+  // възраст на записа (за чистене на стари неща)
+  olderThanDays?: number;
+
   // изключване (черен списък се прилага винаги; тук — ръчни изключвания)
   excludeDomains?: string[];
+
+  // сортиране
+  sortBy?: "quality" | "rating" | "reviews" | "created" | "name";
+  sortDir?: "asc" | "desc";
 
   // разбивка на страници
   limit?: number;

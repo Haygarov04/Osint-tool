@@ -11,6 +11,12 @@ export function parseFilter(sp: URLSearchParams): FilterSpec {
   const website = sp.get("website");
   const excludeDomains = sp.get("excludeDomains");
 
+  const siteOutdated = sp.get("siteOutdated");
+  const noSsl = sp.get("noSsl");
+  const notMobile = sp.get("notMobile");
+  const sortBy = sp.get("sortBy") as FilterSpec["sortBy"];
+  const sortDir = sp.get("sortDir") as FilterSpec["sortDir"];
+
   return {
     country: sp.get("country") || undefined,
     region: sp.get("region") || undefined,
@@ -30,9 +36,16 @@ export function parseFilter(sp: URLSearchParams): FilterSpec {
     centerLat: num("centerLat"),
     centerLon: num("centerLon"),
     radiusKm: num("radiusKm"),
+    siteOutdated: siteOutdated === "true" || siteOutdated === "1" ? true : undefined,
+    noSsl: noSsl === "true" || noSsl === "1" ? true : undefined,
+    notMobile: notMobile === "true" || notMobile === "1" ? true : undefined,
+    tech: sp.get("tech") || undefined,
+    olderThanDays: num("olderThanDays"),
     excludeDomains: excludeDomains
       ? excludeDomains.split(",").map((d) => d.trim()).filter(Boolean)
       : undefined,
+    sortBy: ["quality", "rating", "reviews", "created", "name"].includes(sortBy || "") ? sortBy : undefined,
+    sortDir: sortDir === "asc" || sortDir === "desc" ? sortDir : undefined,
     limit: num("limit"),
     offset: num("offset"),
   };
