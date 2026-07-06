@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addLeadsToFolder, removeLeadsFromFolder } from "@/lib/storage/repository";
+import { addLeadsToFolder, removeLeadsFromFolder, moveLeadsToFolder } from "@/lib/storage/repository";
 
-// POST /api/folders/membership { folder, leadIds: string[], action: "add" | "remove" }
+// POST /api/folders/membership 
+// body:
+// { folder, leadIds, action: "add" | "remove" }
+// or for move: { leadIds, toFolder, fromFolder? }
 export async function POST(req: NextRequest) {
   try {
-    const { folder, leadIds, action } = await req.json();
+    const body = await req.json();
+
+    if (body.toFolder && Array.isArray(body.leadIds)) {
+      // Move action
+      await moveLeadsToFolder(body.leadIds, body.toFolder, body.fromFolder);
+      return NextResponse.json({ ok: true });
+    }
+
+    const { folder, leadIds, action } = body;
 
     if (!folder || !Array.isArray(leadIds) || leadIds.length === 0) {
       return NextResponse.json({ error: "folder and leadIds required" }, { status: 400 });

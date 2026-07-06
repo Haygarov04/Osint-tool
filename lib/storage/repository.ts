@@ -86,6 +86,7 @@ export interface UpsertResult {
   added: number;
   updated: number;
   total: number;
+  ids: string[]; // IDs of leads touched in this batch
 }
 
 // Записва списък лийдове с дедупликация и обновяване на индексите.
@@ -93,6 +94,7 @@ export async function upsertMany(items: NewLead[]): Promise<UpsertResult> {
   const redis = getRedis();
   let added = 0;
   let updated = 0;
+  const touchedIds: string[] = [];
 
   for (const item of items) {
     const domain = item.domain || extractDomain(item.website);
@@ -128,10 +130,12 @@ export async function upsertMany(items: NewLead[]): Promise<UpsertResult> {
     if (phone) p.set(`dedup:phone:${phone}`, lead.id);
     p.set(`dedup:nameaddr:${naKey}`, lead.id);
     await p.exec();
+
+    touchedIds.push(lead.id);
   }
 
   const total = await redis.scard(ALL);
-  return { added, updated, total };
+  return { added, updated, total, ids: touchedIds };
 }
 
 function newLeadRecord(item: NewLead, domain: string): Lead {
@@ -367,16 +371,29 @@ export async function getStats(): Promise<StatsResult> {
 // ==================== FOLDERS (Email-like saved lists) ====================
 
 const FOLDERS_ALL = "folders:all";
+export const DEFAULT_FOLDERS = ["Inbox", "Archive"];
+
+async function ensureDefaultFolders() {
+  const redis = getRedis();
+  for (const f of DEFAULT_FOLDERS) {
+    await redis.sadd(FOLDERS_ALL, f);
+  }
+}
 
 export async function listFolders(): Promise<string[]> {
   const redis = getRedis();
-  return (await redis.smembers(FOLDERS_ALL)) || [];
+  await ensureDefaultFolders();
+  const folders = (await redis.smembers(FOLDERS_ALL)) || [];
+  // Always put Inbox and Archive first
+  const special = folders.filter(f => DEFAULT_FOLDERS.includes(f));
+  const others = folders.filter(f => !DEFAULT_FOLDERS.includes(f));
+  return [...DEFAULT_FOLDERS, ...others.filter(f => !DEFAULT_FOLDERS.includes(f))];
 }
 
 export async function createFolder(name: string): Promise<void> {
   const redis = getRedis();
   const clean = name.trim();
-  if (!clean) return;
+  if (!clean || DEFAULT_FOLDERS.includes(clean)) return;
   await redis.sadd(FOLDERS_ALL, clean);
 }
 
@@ -398,7 +415,43 @@ export async function getLeadIdsInFolder(folder: string): Promise<string[]> {
 }
 
 export async function deleteFolder(folder: string): Promise<void> {
+  if (DEFAULT_FOLDERS.includes(folder)) return; // don't allow deleting defaults
   const redis = getRedis();
   await redis.srem(FOLDERS_ALL, folder);
   await redis.del(`folder:${folder}`);
+}
+
+export async function getFolderCounts(): Promise<Record<string, number>> {
+  const redis = getRedis();
+  await ensureDefaultFolders();
+  const allFolders = await redis.smembers(FOLDERS_ALL);
+  const counts: Record<string, number> = {};
+  for (const f of allFolders) {
+    counts[f] = await redis.scard(`folder:${f}`);
+  }
+  // Ensure defaults are present
+  for (const f of DEFAULT_FOLDERS) {
+    if (!(f in counts)) counts[f] = 0;
+  }
+  return counts;
+}
+
+/**
+ * Move leads from one folder (or none) to another.
+ * If fromFolder is provided, removes from it first.
+ */
+export async function moveLeadsToFolder(leadIds: string[], toFolder: string, fromFolder?: string): Promise<void> {
+  const redis = getRedis();
+  if (!toFolder || leadIds.length === 0) return;
+
+  // Remove from source folder if specified
+  if (fromFolder) {
+    await redis.srem(`folder:${fromFolder}`, leadIds);
+  }
+
+  // Add to target
+  await redis.sadd(`folder:${toFolder}`, leadIds);
+
+  // Make sure target folder exists
+  await redis.sadd(FOLDERS_ALL, toFolder);
 }

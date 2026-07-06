@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSource } from "@/lib/sources";
-import { upsertMany } from "@/lib/storage/repository";
+import { upsertMany, addLeadsToFolder } from "@/lib/storage/repository";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
     let added = 0;
     let updated = 0;
     let total = 0;
+    const touchedIds: string[] = [];
     const errors: string[] = [];
 
     for (const c of combos) {
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
         added += r.added;
         updated += r.updated;
         total = r.total;
+        if (r.ids) touchedIds.push(...r.ids);
       } catch (e) {
         errors.push(
           `${c.location} / ${c.industry}: ${
@@ -86,6 +88,13 @@ export async function POST(req: NextRequest) {
           }`
         );
       }
+    }
+
+    // Автоматично запазване в "Inbox" при събиране
+    if (touchedIds.length > 0) {
+      try {
+        await addLeadsToFolder("Inbox", touchedIds);
+      } catch {}
     }
 
     return NextResponse.json({

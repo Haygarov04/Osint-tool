@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listFolders, createFolder, addLeadsToFolder, removeLeadsFromFolder, deleteFolder } from "@/lib/storage/repository";
+import { listFolders, createFolder, deleteFolder, getFolderCounts } from "@/lib/storage/repository";
 
 export const runtime = "nodejs";
 
-// GET /api/folders → списък с папки
+// GET /api/folders → списък с папки + броячи
 export async function GET() {
-  const folders = await listFolders();
-  return NextResponse.json({ folders });
+  const [folders, counts] = await Promise.all([
+    listFolders(),
+    getFolderCounts()
+  ]);
+  return NextResponse.json({ folders, counts });
 }
 
 // POST /api/folders { name }

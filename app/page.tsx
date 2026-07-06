@@ -109,6 +109,7 @@ export default function Home() {
 
   // Folders (email-like)
   const [folders, setFolders] = useState<string[]>([]);
+  const [folderCounts, setFolderCounts] = useState<Record<string, number>>({});
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -150,6 +151,7 @@ export default function Home() {
     if (res.ok) {
       const data = await res.json();
       setFolders(data.folders || []);
+      setFolderCounts(data.counts || {});
     }
   }, []);
 
@@ -179,7 +181,7 @@ export default function Home() {
         if (data.errors?.length) {
           setError(`Пропуснати комбинации: ${data.errors.join(" · ")}`);
         }
-        await Promise.all([loadLeads(filters), loadStats()]);
+        await Promise.all([loadLeads(filters), loadStats(), loadFolders()]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Мрежова грешка.");
@@ -300,7 +302,20 @@ export default function Home() {
     });
     setMessage(`Запазени ${selectedLeadIds.length} лийда в "${folder}"`);
     setSelectedLeadIds([]);
-    await loadFolders();
+    await Promise.all([loadFolders(), loadLeads(filters)]);
+  }
+
+  async function moveSelectedToFolder(toFolder: string) {
+    if (selectedLeadIds.length === 0) return;
+    const from = currentFolder || undefined;
+    await fetch("/api/folders/membership", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadIds: selectedLeadIds, toFolder, fromFolder: from }),
+    });
+    setMessage(`Преместени ${selectedLeadIds.length} лийда в "${toFolder}"`);
+    setSelectedLeadIds([]);
+    await Promise.all([loadFolders(), loadLeads(filters)]);
   }
 
   async function createNewFolder() {
@@ -364,15 +379,19 @@ export default function Home() {
           Всички
         </button>
 
-        {folders.map((f) => (
-          <button
-            key={f}
-            onClick={() => switchFolder(f)}
-            className={`rounded px-3 py-1 ${currentFolder === f ? "bg-blue-600 text-white" : "hover:bg-blue-50"}`}
-          >
-            📁 {f}
-          </button>
-        ))}
+        {folders.map((f) => {
+          const count = folderCounts[f] ?? 0;
+          const isSpecial = f === "Inbox" || f === "Archive";
+          return (
+            <button
+              key={f}
+              onClick={() => switchFolder(f)}
+              className={`rounded px-3 py-1 flex items-center gap-1 ${currentFolder === f ? (f === "Archive" ? "bg-red-600 text-white" : "bg-blue-600 text-white") : "hover:bg-slate-100"}`}
+            >
+              {isSpecial ? (f === "Inbox" ? "📥" : "🗄️") : "📁"} {f} <span className="text-xs opacity-70">({count})</span>
+            </button>
+          );
+        })}
 
         <div className="ml-auto flex items-center gap-2">
           <input
@@ -392,9 +411,12 @@ export default function Home() {
           <span>Избрани: <strong>{selectedLeadIds.length}</strong></span>
           <button onClick={() => setSelectedLeadIds([])} className="text-blue-600 underline">Откажи</button>
 
-          <div className="ml-4 flex gap-1">
-            {folders.map(f => (
-              <button key={f} onClick={() => saveSelectedToFolder(f)} className="rounded border px-2 py-0.5 text-xs hover:bg-white">Запази в {f}</button>
+          <div className="ml-4 flex gap-2 items-center flex-wrap">
+            <button onClick={() => saveSelectedToFolder("Inbox")} className="rounded border px-2 py-0.5 text-xs hover:bg-white">→ Inbox</button>
+            <button onClick={() => moveSelectedToFolder("Archive")} className="rounded border px-2 py-0.5 text-xs hover:bg-white text-red-600">Archive 🗄️</button>
+
+            {folders.filter(f => f !== "Inbox" && f !== "Archive").map(f => (
+              <button key={f} onClick={() => moveSelectedToFolder(f)} className="rounded border px-2 py-0.5 text-xs hover:bg-white">→ {f}</button>
             ))}
           </div>
           <button onClick={() => setSelectedLeadIds([])} className="ml-auto text-xs text-red-600">Изчисти избор</button>
