@@ -16,6 +16,7 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
   const [current, setCurrent] = useState(lead);
   const [busy, setBusy] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [messageBusy, setMessageBusy] = useState(false);
   const [generated, setGenerated] = useState<{ subject: string; body: string } | null>(null);
   const [notes, setNotes] = useState(lead.notes || "");
@@ -61,7 +62,11 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
         body: JSON.stringify({ leadId: current.id, offer: aiOffer }),
       });
       const data = await res.json();
-      if (res.ok) setGenerated(data);
+      if (res.ok) {
+        setGenerated(data);
+      } else {
+        setAnalysisError(data.error || "Грешка при генериране на съобщение.");
+      }
     } finally {
       setMessageBusy(false);
     }
@@ -70,6 +75,7 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
   // По-добър анализ с Grok (само при клик) - fixed to always work and show result or error
   const runAnalysis = async () => {
     setAnalysisBusy(true);
+    setAnalysisError(null);
     try {
       const res = await fetch("/api/ai/analyze-lead", {
         method: "POST",
@@ -81,10 +87,10 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
         setCurrent(data.lead);
         onUpdated(data.lead);
       } else {
-        alert(data.error || "Грешка при анализ с Grok. Провери XAI_API_KEY и опитай пак.");
+        setAnalysisError(data.error || "Грешка при анализ с Grok. Провери XAI_API_KEY.");
       }
     } catch (err) {
-      alert("Не успя да се свърже с xAI. Провери ключа и интернет.");
+      setAnalysisError("Не успя да се свърже с xAI. Провери ключа и интернет.");
     } finally {
       setAnalysisBusy(false);
     }
@@ -189,6 +195,9 @@ export default function LeadModal({ lead, onClose, onUpdated, aiOffer }: Props) 
                 {analysisBusy ? "Анализирам..." : "По-добър анализ с Grok"}
               </button>
             </div>
+            {analysisError && (
+              <div className="text-sm text-red-600 mb-2">Грешка: {analysisError}</div>
+            )}
             {current.aiInsights ? (
               <div className="whitespace-pre-wrap text-sm text-slate-700">{current.aiInsights}</div>
             ) : (

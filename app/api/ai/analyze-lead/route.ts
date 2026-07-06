@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ analysis: formatted, lead: { ...lead, aiInsights: formatted } });
   } catch (err: any) {
+    console.error("analyze-lead error:", err);
     return NextResponse.json({ error: err.message || "Analysis failed" }, { status: 500 });
   }
 }

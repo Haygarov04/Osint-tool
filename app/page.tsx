@@ -232,11 +232,12 @@ export default function Home() {
   // Folder navigation (email style)
   async function switchFolder(folder: string | null) {
     setCurrentFolder(folder);
-    const newFilters = { ...filters };
-    // We will pass folder via query
-    const query = buildQuery(newFilters);
+    // reset client filters to show all in the folder
+    setActiveStatusFilter('all');
+    setSelectedSource('all');
+    setSearchTerm('');
     const folderParam = folder ? `&folder=${encodeURIComponent(folder)}` : "";
-    const res = await fetch(`/api/leads?${query}${folderParam}&limit=300`);
+    const res = await fetch(`/api/leads?${folderParam}&limit=300`);
     const data = await res.json();
     if (res.ok) {
       setLeads(data.leads || []);
@@ -353,8 +354,17 @@ export default function Home() {
       body: JSON.stringify({ leadIds: selectedLeadIds, toFolder, fromFolder: from }),
     });
     setMessage(`Преместени ${selectedLeadIds.length} лийда в "${toFolder}"`);
+    const moved = [...selectedLeadIds];
     setSelectedLeadIds([]);
-    await Promise.all([loadFolders(), loadLeads(filters)]);
+    await loadFolders();
+    if (currentFolder === toFolder || currentFolder === null) {
+      const fp = toFolder ? `&folder=${encodeURIComponent(toFolder)}` : '';
+      const r = await fetch(`/api/leads?${fp}&limit=300`);
+      const d = await r.json();
+      if (r.ok) { setLeads(d.leads || []); setTotal(d.total || 0); }
+    } else {
+      await loadLeads(filters);
+    }
   }
 
   async function createNewFolder() {
@@ -444,7 +454,20 @@ export default function Home() {
 
       setMessage(`Преместени ${ids.length} лийда в "${folder}"`);
       setSelectedLeadIds([]);
-      await Promise.all([loadFolders(), loadLeads(filters)]);
+      await loadFolders();
+      // live update: if current view is the target folder or All, reload leads for it
+      if (currentFolder === folder || currentFolder === null) {
+        const folderParam = folder ? `&folder=${encodeURIComponent(folder)}` : '';
+        const res = await fetch(`/api/leads?${folderParam}&limit=300`);
+        const data = await res.json();
+        if (res.ok) {
+          setLeads(data.leads || []);
+          setTotal(data.total || 0);
+        }
+      } else {
+        // just reload current view without the moved ones
+        await loadLeads(filters);
+      }
     } catch (err) {
       setError("Грешка при преместване");
     }
@@ -458,6 +481,27 @@ export default function Home() {
 
   function handleDragLeave() {
     setDragOverFolder(null);
+  }
+
+  async function handleDropToAll(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOverFolder(null);
+    if (!currentFolder) return;
+    try {
+      const idsJson = e.dataTransfer.getData("application/json");
+      if (!idsJson) return;
+      const ids: string[] = JSON.parse(idsJson);
+      if (ids.length === 0) return;
+      await fetch("/api/folders/membership", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: ids, folder: currentFolder, action: "remove" }),
+      });
+      setMessage(`Преместени ${ids.length} лийда в All (премахнати от ${currentFolder})`);
+      setSelectedLeadIds([]);
+      await loadFolders();
+      await loadLeads(filters);
+    } catch {}
   }
 
   return (
@@ -496,9 +540,10 @@ export default function Home() {
       )}
 
       {/* Full Premium Layout matching the reference image + Maltego features */}
-      <div className="flex gap-6">
-        {/* LEFT SIDEBAR: Filters + Folders + New Folder + Transforms */}
-        <div className="w-72 shrink-0 space-y-4">
+      <div className="flex gap-6 items-start">
+        {/* LEFT SIDEBAR: Filters + Folders + New Folder + Transforms - sticky */}
+        <div className="w-72 shrink-0 sticky top-4 self-start">
+          <div className="space-y-4">
           <div className="sidebar-card">
             <div className="text-xs font-semibold text-slate-500 mb-3">FILTERS</div>
             <div className="mb-4">
@@ -515,17 +560,42 @@ export default function Home() {
             <div>
               <div className="text-[10px] font-medium text-slate-400 mb-1.5">FOLDERS</div>
               <div className="space-y-0.5 text-sm">
-                <button onClick={() => switchFolder(null)} className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${!currentFolder ? 'bg-violet-100' : 'hover:bg-slate-50'}`}>
+                <button 
+                  onClick={() => switchFolder(null)} 
+                  onDragOver={(e) => handleDragOver(e, 'All')} 
+                  onDragLeave={handleDragLeave} 
+                  onDrop={handleDropToAll} 
+                  className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${!currentFolder ? 'bg-violet-100' : 'hover:bg-slate-50'} ${dragOverFolder === 'All' ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+                >
                   All leads <span>{stats?.total || 0}</span>
                 </button>
-                <button onClick={() => switchFolder('Inbox')} className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === 'Inbox' ? 'bg-blue-100' : 'hover:bg-slate-50'}`}>
+                <button 
+                  onClick={() => switchFolder('Inbox')} 
+                  onDragOver={(e) => handleDragOver(e, 'Inbox')} 
+                  onDragLeave={handleDragLeave} 
+                  onDrop={(e) => handleFolderDrop('Inbox', e)} 
+                  className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === 'Inbox' ? 'bg-blue-100' : 'hover:bg-slate-50'} ${dragOverFolder === 'Inbox' ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+                >
                   📥 Inbox <span>{folderCounts['Inbox'] || 0}</span>
                 </button>
-                <button onClick={() => switchFolder('Archive')} className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === 'Archive' ? 'bg-red-100' : 'hover:bg-slate-50'}`}>
+                <button 
+                  onClick={() => switchFolder('Archive')} 
+                  onDragOver={(e) => handleDragOver(e, 'Archive')} 
+                  onDragLeave={handleDragLeave} 
+                  onDrop={(e) => handleFolderDrop('Archive', e)} 
+                  className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === 'Archive' ? 'bg-red-100' : 'hover:bg-slate-50'} ${dragOverFolder === 'Archive' ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+                >
                   🗄️ Archive <span>{folderCounts['Archive'] || 0}</span>
                 </button>
                 {folders.filter(f => !['Inbox','Archive'].includes(f)).map(f => (
-                  <button key={f} onClick={() => switchFolder(f)} className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === f ? 'bg-violet-100' : 'hover:bg-slate-50'}`}>
+                  <button 
+                    key={f} 
+                    onClick={() => switchFolder(f)} 
+                    onDragOver={(e) => handleDragOver(e, f)} 
+                    onDragLeave={handleDragLeave} 
+                    onDrop={(e) => handleFolderDrop(f, e)} 
+                    className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === f ? 'bg-violet-100' : 'hover:bg-slate-50'} ${dragOverFolder === f ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+                  >
                     📁 {f} <span>{folderCounts[f] || 0}</span>
                   </button>
                 ))}
@@ -562,6 +632,7 @@ export default function Home() {
               <button onClick={() => runTransform('ai-suggest')} className="w-full text-left px-2 py-1 hover:bg-slate-50 rounded">✨ Ask Grok for links</button>
             </div>
           </div>
+          </div>
         </div>
 
         {/* MAIN CONTENT */}
@@ -597,7 +668,13 @@ export default function Home() {
             <div className="space-y-3">
               {filteredLeads.length === 0 && <div className="p-8 text-center text-slate-400 bg-white rounded-3xl">No leads match the current filters.</div>}
               {filteredLeads.map(l => (
-                <div key={l.id} className="lead-card group" onClick={() => setSelectedLead(l)}>
+                <div 
+                  key={l.id} 
+                  className="lead-card group cursor-grab active:cursor-grabbing" 
+                  draggable
+                  onDragStart={(e) => handleDragStart(l.id, e)}
+                  onClick={() => setSelectedLead(l)}
+                >
                   <div>
                     <span className={`status-pill ${l.status === 'customer' ? 'bg-green-100 text-green-700' : l.status === 'contacted' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
                       {l.status}
@@ -624,7 +701,19 @@ export default function Home() {
                     <select value={l.status} onChange={e => updateLeadStatus(l.id, e.target.value as any)} className="text-xs rounded-full border px-2 py-1 bg-white">
                       {STATUSES.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
                     </select>
-                    <select value={currentFolder || 'Inbox'} onChange={e => { /* move */ fetch("/api/folders/membership", {method:"POST", body:JSON.stringify({leadIds:[l.id], toFolder: e.target.value, fromFolder: currentFolder})}).then(()=>loadLeads(filters)); }} className="text-xs rounded-full border px-2 py-1 bg-white">
+                    <select value={currentFolder || 'Inbox'} onChange={async e => { 
+                      const to = e.target.value;
+                      await fetch("/api/folders/membership", {method:"POST", headers:{'Content-Type':'application/json'}, body:JSON.stringify({leadIds:[l.id], toFolder: to, fromFolder: currentFolder})});
+                      await loadFolders();
+                      if (currentFolder === to || currentFolder === null) {
+                        const fp = to ? `&folder=${encodeURIComponent(to)}` : '';
+                        const r = await fetch(`/api/leads?${fp}&limit=300`);
+                        const d = await r.json();
+                        if (r.ok) { setLeads(d.leads||[]); setTotal(d.total||0); }
+                      } else {
+                        await loadLeads(filters);
+                      }
+                    }} className="text-xs rounded-full border px-2 py-1 bg-white">
                       <option>Inbox</option><option>Archive</option>
                       {folders.map(f=><option key={f}>{f}</option>)}
                     </select>

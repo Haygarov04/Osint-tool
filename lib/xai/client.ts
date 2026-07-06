@@ -11,6 +11,7 @@ export interface GenerateOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  jsonMode?: boolean;
 }
 
 export async function xaiChat(
@@ -22,10 +23,22 @@ export async function xaiChat(
   }
 
   const {
-    model = "grok-4.3",
+    model = "grok-2-1212",
     temperature = 0.7,
     maxTokens = 800,
+    jsonMode = false,
   } = opts;
+
+  const body: any = {
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+  };
+
+  if (jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
 
   const res = await fetch(`${XAI_BASE}/chat/completions`, {
     method: "POST",
@@ -33,12 +46,7 @@ export async function xaiChat(
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.xaiApiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

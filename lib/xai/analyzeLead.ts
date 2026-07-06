@@ -24,7 +24,7 @@ Tech: ${lead.techStack?.join(", ") || "-"}
 Качество: ${lead.qualityScore}/100
   `.trim();
 
-  const system = `Ти си опитен B2B sales консултант в България. Даваш кратък, точен, actionable анализ за лийд. Отговаряш само на български.`;
+  const system = `Ти си опитен B2B sales консултант в България. Даваш кратък, точен, actionable анализ за лийд. Отговаряш само на български. Винаги връщай валиден JSON.`;
 
   const user = `Анализирай този лийд за продажба на услуги (уебсайтове, SEO, автоматизации и т.н.).
 
@@ -46,11 +46,19 @@ ${context}
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    { temperature: 0.4, maxTokens: 700 }
+    { temperature: 0.4, maxTokens: 700, jsonMode: true }
   );
 
   try {
-    // Опитваме да извлечем JSON
+    // With jsonMode, raw should be valid JSON
+    const parsed = JSON.parse(raw);
+    if (parsed.summary && parsed.whyGoodLead) {
+      return parsed;
+    }
+  } catch {}
+
+  // Try loose match as fallback
+  try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
