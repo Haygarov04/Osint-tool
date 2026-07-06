@@ -29,6 +29,7 @@ export default function LeadTable({
   onSelectLead,
   selectedIds,
   onToggleSelect,
+  onDragStartLead,
 }: {
   leads: Lead[];
   onUpdated?: () => void;
@@ -37,6 +38,7 @@ export default function LeadTable({
   onSelectLead?: (lead: Lead) => void;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
+  onDragStartLead?: (leadId: string, e: React.DragEvent<HTMLTableRowElement>) => void;
 }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -100,12 +102,21 @@ export default function LeadTable({
           {leads.map((l) => {
             const socialCount = [l.facebook, l.instagram, l.linkedin, l.youtube, l.tiktok].filter(Boolean).length;
             return (
-              <tr key={l.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onSelectLead?.(l)}>
+              <tr 
+                key={l.id} 
+                className="hover:bg-slate-50 cursor-grab active:cursor-grabbing" 
+                draggable
+                onDragStart={(e) => onDragStartLead?.(l.id, e)}
+                onClick={(e) => {
+                  // Only open modal if not dragging
+                  if (!e.defaultPrevented) onSelectLead?.(l);
+                }}
+              >
                 <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedIds?.includes(l.id) || false}
-                    onChange={() => onToggleSelect?.(l.id)}
+                    onChange={(e) => { e.stopPropagation(); onToggleSelect?.(l.id); }}
                   />
                 </td>
                 <td className="px-3 py-2 font-medium max-w-[220px] truncate text-blue-700 hover:underline" title={l.name}>{l.name}</td>

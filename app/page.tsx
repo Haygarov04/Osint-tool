@@ -113,6 +113,7 @@ export default function Home() {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
 
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [k]: v }));
@@ -319,14 +320,75 @@ export default function Home() {
   }
 
   async function createNewFolder() {
-    if (!newFolderName.trim()) return;
+    const name = newFolderName.trim();
+    if (!name) return;
+
     await fetch("/api/folders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newFolderName.trim() }),
+      body: JSON.stringify({ name }),
     });
+
+    const createdName = name;
     setNewFolderName("");
     await loadFolders();
+
+    // Ако има избрани, автоматично ги премести в новата папка
+    if (selectedLeadIds.length > 0) {
+      await moveSelectedToFolder(createdName);
+    }
+  }
+
+  // === Drag & Drop ===
+  function handleDragStart(leadId: string, e: React.DragEvent<HTMLTableRowElement>) {
+    let idsToDrag = [leadId];
+
+    // Ако този lead е в селекцията и има повече от 1, drag-ваме цялата селекция
+    if (selectedLeadIds.includes(leadId) && selectedLeadIds.length > 1) {
+      idsToDrag = [...selectedLeadIds];
+    } else if (selectedLeadIds.length > 0 && !selectedLeadIds.includes(leadId)) {
+      // Ако има селекция но drag-ваме друг, вземи само този
+      idsToDrag = [leadId];
+    }
+
+    e.dataTransfer.setData("application/json", JSON.stringify(idsToDrag));
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  async function handleFolderDrop(folder: string, e: React.DragEvent) {
+    e.preventDefault();
+    setDragOverFolder(null);
+
+    try {
+      const idsJson = e.dataTransfer.getData("application/json");
+      if (!idsJson) return;
+
+      const ids: string[] = JSON.parse(idsJson);
+      if (ids.length === 0) return;
+
+      const from = currentFolder || undefined;
+      await fetch("/api/folders/membership", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: ids, toFolder: folder, fromFolder: from }),
+      });
+
+      setMessage(`Преместени ${ids.length} лийда в "${folder}"`);
+      setSelectedLeadIds([]);
+      await Promise.all([loadFolders(), loadLeads(filters)]);
+    } catch (err) {
+      setError("Грешка при преместване");
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent, folder: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverFolder(folder);
+  }
+
+  function handleDragLeave() {
+    setDragOverFolder(null);
   }
 
   return (
@@ -382,26 +444,64 @@ export default function Home() {
         {folders.map((f) => {
           const count = folderCounts[f] ?? 0;
           const isSpecial = f === "Inbox" || f === "Archive";
+          const isDraggingOver = dragOverFolder === f;
+
           return (
             <button
               key={f}
               onClick={() => switchFolder(f)}
-              className={`rounded px-3 py-1 flex items-center gap-1 ${currentFolder === f ? (f === "Archive" ? "bg-red-600 text-white" : "bg-blue-600 text-white") : "hover:bg-slate-100"}`}
+              onDragOver={(e) => handleDragOver(e, f)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleFolderDrop(f, e)}
+              className={`rounded px-3 py-1 flex items-center gap-1 transition-all ${
+                currentFolder === f 
+                  ? (f === "Archive" ? "bg-red-600 text-white" : "bg-blue-600 text-white") 
+                  : "hover:bg-slate-100"
+              } ${isDraggingOver ? "ring-2 ring-blue-400 scale-105 bg-blue-50" : ""}`}
             >
-              {isSpecial ? (f === "Inbox" ? "📥" : "🗄️") : "📁"} {f} <span className="text-xs opacity-70">({count})</span>
+              {isSpecial ? (f === "Inbox" ? "📥" : "🗄️") : "📁"} {f} 
+              <span className="text-xs opacity-70">({count})</span>
             </button>
           );
         })}
 
         <div className="ml-auto flex items-center gap-2">
-          <input
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            placeholder="Нова папка..."
-            className="w-40 rounded border px-2 py-1 text-sm"
-            onKeyDown={(e) => { if (e.key === "Enter") createNewFolder(); }}
-          />
-          <button onClick={createNewFolder} className="rounded bg-slate-800 px-3 py-1 text-white text-sm">Създай</button>
+          <button 
+            onClick={() => {
+              const name = prompt("Име на новата папка:");
+              if (name) {
+                // Create via API then handle move
+                fetch("/api/folders", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: name.trim() }),
+                }).then(() => loadFolders()).then(() => {
+                  if (selectedLeadIds.length > 0) {
+                    moveSelectedToFolder(name.trim());
+                  }
+                });
+              }
+            }}
+            className="rounded bg-emerald-600 px-3 py-1 text-white text-sm flex items-center gap-1 hover:bg-emerald-700"
+          >
+            + Нова папка
+          </button>
+
+          <div className="flex items-center border rounded">
+            <input
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="Име на папка..."
+              className="w-36 rounded-l px-2 py-1 text-sm focus:outline-none"
+              onKeyDown={(e) => { if (e.key === "Enter") createNewFolder(); }}
+            />
+            <button 
+              onClick={createNewFolder} 
+              className="rounded-r bg-slate-800 px-3 py-1 text-white text-sm hover:bg-black"
+            >
+              Създай
+            </button>
+          </div>
         </div>
       </div>
 
@@ -699,6 +799,7 @@ export default function Home() {
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
           );
         }}
+        onDragStartLead={handleDragStart}
       />
 
       {/* AI Message Modal (global quick one) */}
