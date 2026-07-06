@@ -10,6 +10,15 @@ const STATUS_LABELS: Record<LeadStatus, string> = {
   unsubscribed: "Отписан",
 };
 
+const STATUS_COLORS: Record<LeadStatus, string> = {
+  new: "bg-slate-100 text-slate-700",
+  processed: "bg-blue-100 text-blue-700",
+  contacted: "bg-amber-100 text-amber-700",
+  replied: "bg-emerald-100 text-emerald-700",
+  customer: "bg-green-600 text-white",
+  unsubscribed: "bg-red-100 text-red-700",
+};
+
 const STATUSES: LeadStatus[] = ["new", "processed", "contacted", "replied", "customer", "unsubscribed"];
 
 export default function LeadTable({

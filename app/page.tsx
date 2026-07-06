@@ -333,6 +333,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Social OSINT Enrichment */}
+      <section className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="text-sm">
+          <span className="font-medium text-blue-900">Социални профили (OSINT)</span>
+          <span className="ml-2 text-blue-600">
+            Търси Facebook/Instagram/LinkedIn по име + град (полезно за бизнеси без сайт).
+          </span>
+        </div>
+        <button
+          onClick={async () => {
+            setMessage("Търся социални профили...");
+            const res = await fetch("/api/enrich-social", { method: "POST", body: JSON.stringify({ limit: 25 }) });
+            const data = await res.json();
+            setMessage(`Намерени ${data.enriched} нови социални профила.`);
+            loadLeads(filters);
+            loadStats();
+          }}
+          className="ml-auto rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Намери социални профили
+        </button>
+      </section>
+
       {/* Филтри */}
       <section className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
         <Select
@@ -493,6 +516,29 @@ export default function Home() {
           >
             Свали CSV
           </a>
+
+          {/* Delete filtered - опасна, но полезна */}
+          <button
+            onClick={async () => {
+              if (!confirm(`Изтриване на всички лийдове, които отговарят на филтрите?\nТова е НЕОБРАТИМО.`)) return;
+              const res = await fetch("/api/leads/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filters: buildQuery(filters) }),
+              });
+              const d = await res.json();
+              if (res.ok) {
+                setMessage(`Изтрити ${d.deleted} записа.`);
+                loadLeads(filters);
+                loadStats();
+              } else {
+                setError(d.error || "Грешка");
+              }
+            }}
+            className="h-9 rounded border border-red-300 bg-red-50 px-3 text-sm font-medium text-red-700 hover:bg-red-100"
+          >
+            Изтрий филтрираните
+          </button>
         </div>
       </section>
 

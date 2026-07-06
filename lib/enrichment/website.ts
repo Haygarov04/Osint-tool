@@ -36,7 +36,35 @@ const JUNK = [
   ".gif",
   ".webp",
   ".svg",
+  "noreply",
+  "no-reply",
+  "donotreply",
 ];
+
+// По-добри пътища за български и английски сайтове
+const CONTACT_PATHS = [
+  "",
+  "/contact",
+  "/contacts",
+  "/kontakti",
+  "/za-kontakti",
+  "/contact-us",
+  "/kontakt",
+  "/kontakti.html",
+  "/contact.html",
+  "/za-nas",
+  "/about",
+  "/about-us",
+];
+
+// Разширени regex за социални мрежи
+const SOCIAL_REGEXES = {
+  facebook: /https?:\/\/(?:www\.)?facebook\.com\/(?!sharer|plugins|tr\?)([A-Za-z0-9._%\-\/]+)/i,
+  instagram: /https?:\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9._%\-\/]+)/i,
+  linkedin: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in|school)\/([A-Za-z0-9._%\-\/]+)/i,
+  youtube: /https?:\/\/(?:www\.)?youtube\.com\/(?:c\/|channel\/|@|user\/)([A-Za-z0-9._%\-\/]+)/i,
+  tiktok: /https?:\/\/(?:www\.)?tiktok\.com\/@([A-Za-z0-9._%\-\/]+)/i,
+};
 
 // Засичане на технологии по сигнатури в HTML.
 const TECH_SIGNATURES: [string, RegExp][] = [
@@ -96,6 +124,21 @@ function extractDescription(html: string): string {
   return m ? m[1].trim().slice(0, 300) : "";
 }
 
+function extractSocials(html: string): Record<"facebook" | "instagram" | "linkedin" | "youtube" | "tiktok", string> {
+  const out: any = { facebook: "", instagram: "", linkedin: "", youtube: "", tiktok: "" };
+  const fb = html.match(/https?:\/\/(?:www\.)?facebook\.com\/(?!sharer|plugins|tr\?)([A-Za-z0-9._%\-\/]+)/i);
+  if (fb) out.facebook = fb[0].split(/[?"']/)[0];
+  const ig = html.match(/https?:\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9._%\-\/]+)/i);
+  if (ig) out.instagram = ig[0].split(/[?"']/)[0];
+  const li = html.match(/https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/([A-Za-z0-9._%\-\/]+)/i);
+  if (li) out.linkedin = li[0].split(/[?"']/)[0];
+  const yt = html.match(/https?:\/\/(?:www\.)?youtube\.com\/(?:c\/|channel\/|@|user\/)([A-Za-z0-9._%\-\/]+)/i);
+  if (yt) out.youtube = yt[0].split(/[?"']/)[0];
+  const tt = html.match(/https?:\/\/(?:www\.)?tiktok\.com\/@([A-Za-z0-9._%\-\/]+)/i);
+  if (tt) out.tiktok = tt[0].split(/[?"']/)[0];
+  return out;
+}
+
 // Скролва сайта: пробва https, после http; чете homepage + вероятни контактни страници.
 export async function scrapeWebsite(website: string): Promise<WebsiteData> {
   const domain = extractDomain(website);
@@ -146,37 +189,35 @@ export async function scrapeWebsite(website: string): Promise<WebsiteData> {
     ([name]) => name
   );
 
-  const socials = {
-    facebook: firstMatch(
-      home,
-      /https?:\/\/(?:www\.)?facebook\.com\/(?!sharer|plugins|tr\?)[A-Za-z0-9._%\-\/?=&]+/i
-    ),
-    instagram: firstMatch(
-      home,
-      /https?:\/\/(?:www\.)?instagram\.com\/[A-Za-z0-9._\-\/?=&]+/i
-    ),
-    linkedin: firstMatch(
-      home,
-      /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[A-Za-z0-9._\-\/?=&]+/i
-    ),
-    youtube: firstMatch(
-      home,
-      /https?:\/\/(?:www\.)?youtube\.com\/(?:c\/|channel\/|@)[A-Za-z0-9._\-\/?=&]+/i
-    ),
-    tiktok: firstMatch(
-      home,
-      /https?:\/\/(?:www\.)?tiktok\.com\/@[A-Za-z0-9._\-\/?=&]+/i
-    ),
-  };
+  // По-добро извличане на социални мрежи (homepage + контактни)
+  const allHtmlForSocials = [home];
+  for (const path of CONTACT_PATHS.slice(1, 6)) {
+    const extra = await fetchPage(origin + path, { timeoutMs: 6000 });
+    if (extra?.html) allHtmlForSocials.push(extra.html);
+  }
+
+  const combinedSocialHtml = allHtmlForSocials.join("\n");
+  const socials = extractSocials(combinedSocialHtml);
   Object.assign(result, socials);
 
-  // имейл/телефон: homepage + до няколко контактни страници
-  const paths = ["", "/contact", "/kontakti", "/contacts", "/za-kontakti"];
-  for (const path of paths) {
-    const html = path === "" ? home : (await fetchPage(origin + path, { timeoutMs: 8000 }))?.html;
+  // имейл/телефон: homepage + много контактни страници (по-добро покритие)
+  for (const path of CONTACT_PATHS) {
+    const html = path === "" ? home : (await fetchPage(origin + path, { timeoutMs: 7000 }))?.html;
     if (!html) continue;
-    if (!result.emails.length) result.emails = cleanEmails(html, domain);
-    if (!result.phones.length) result.phones = extractPhones(html);
+
+    if (!result.emails.length) {
+      result.emails = cleanEmails(html, domain);
+    }
+    if (!result.phones.length) {
+      result.phones = extractPhones(html);
+    }
+
+    // Търсим социални и на тези страници
+    const extraSocial = extractSocials(html);
+    if (!result.facebook && extraSocial.facebook) result.facebook = extraSocial.facebook;
+    if (!result.instagram && extraSocial.instagram) result.instagram = extraSocial.instagram;
+    if (!result.linkedin && extraSocial.linkedin) result.linkedin = extraSocial.linkedin;
+
     if (result.emails.length && result.phones.length) break;
   }
 
