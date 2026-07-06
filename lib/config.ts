@@ -8,6 +8,7 @@ export const config = {
   nominatimUrl: "https://nominatim.openstreetmap.org/search",
   // Учтив User-Agent — Nominatim/Overpass изискват идентификация.
   userAgent: "OsintLeadTool/0.1 (+https://github.com/Haygarov04/Osint-tool)",
+  xaiApiKey: process.env.XAI_API_KEY ?? "",
 };
 
 // Vercel/Upstash интеграцията понякога дава UPSTASH_*, понякога KV_* имена —
@@ -30,4 +31,8 @@ export function hasUpstash(): boolean {
 
 export function hasGoogle(): boolean {
   return Boolean(config.googleMapsApiKey);
+}
+
+export function hasXai(): boolean {
+  return Boolean(config.xaiApiKey);
 }

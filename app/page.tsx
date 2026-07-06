@@ -92,8 +92,27 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef(false);
 
+  // === xAI Outreach ===
+  const [aiOffer, setAiOffer] = useState(
+    () => (typeof window !== "undefined" ? localStorage.getItem("aiOffer") || "" : "")
+  );
+  const [aiGeneratingFor, setAiGeneratingFor] = useState<string | null>(null);
+  const [generatedMessage, setGeneratedMessage] = useState<{
+    leadName: string;
+    subject: string;
+    body: string;
+  } | null>(null);
+
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [k]: v }));
+
+  // Запазваме офертата в localStorage
+  const updateAiOffer = (value: string) => {
+    setAiOffer(value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiOffer", value);
+    }
+  };
 
   const loadLeads = useCallback(async (f: Filters) => {
     setError(null);
@@ -184,6 +203,55 @@ export default function Home() {
     }
   }
 
+  // === xAI: Генериране на персонализирано съобщение ===
+  async function generateAiMessage(lead: Lead) {
+    if (!aiOffer.trim()) {
+      setError("Първо опиши офертата си в секцията „AI Outreach“ горе.");
+      return;
+    }
+
+    setAiGeneratingFor(lead.id);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/ai/generate-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: lead.id,
+          offer: aiOffer.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Грешка при генериране.");
+        return;
+      }
+
+      setGeneratedMessage({
+        leadName: lead.name,
+        subject: data.subject,
+        body: data.body,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Мрежова грешка при xAI.");
+    } finally {
+      setAiGeneratingFor(null);
+    }
+  }
+
+  function closeAiModal() {
+    setGeneratedMessage(null);
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+    setMessage("Копирано в клипборда ✓");
+    setTimeout(() => setMessage(null), 1500);
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6">
@@ -239,6 +307,29 @@ export default function Home() {
               Спри
             </button>
           )}
+        </div>
+      </section>
+
+      {/* xAI Outreach */}
+      <section className="mb-6 rounded-lg border border-violet-200 bg-violet-50 p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-sm font-semibold text-violet-900">✨ AI Outreach с xAI (Grok)</span>
+          <span className="text-xs text-violet-600">персонализирани съобщения за всеки лийд</span>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-violet-700">Твоята оферта / услуга</label>
+            <input
+              className="mt-1 w-full rounded border border-violet-300 bg-white px-3 py-2 text-sm placeholder:text-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              placeholder="напр. Модерен уеб сайт + SEO за локални бизнеси"
+              value={aiOffer}
+              onChange={(e) => updateAiOffer(e.target.value)}
+            />
+          </div>
+          <div className="text-xs text-violet-600 sm:pb-2">
+            Grok ще генерира уникално съобщение, базирано на данните за бизнеса.
+          </div>
         </div>
       </section>
 
@@ -408,7 +499,94 @@ export default function Home() {
       <div className="mb-2 text-sm text-slate-500">
         Показани {leads.length} от {total} съвпадащи.
       </div>
-      <LeadTable leads={leads} onUpdated={() => loadLeads(filters)} />
+      <LeadTable
+        leads={leads}
+        onUpdated={() => loadLeads(filters)}
+        onGenerateMessage={generateAiMessage}
+        generatingId={aiGeneratingFor}
+      />
+
+      {/* AI Message Modal */}
+      {generatedMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-5 py-3">
+              <div>
+                <div className="font-semibold">✨ Персонализирано съобщение</div>
+                <div className="text-sm text-slate-500">{generatedMessage.leadName}</div>
+              </div>
+              <button
+                onClick={closeAiModal}
+                className="text-2xl leading-none text-slate-400 hover:text-slate-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-500">
+                  <span>SUBJECT</span>
+                  <button
+                    onClick={() => copyToClipboard(generatedMessage.subject)}
+                    className="text-violet-600 hover:underline"
+                  >
+                    Копирай
+                  </button>
+                </div>
+                <div className="rounded border bg-slate-50 px-3 py-2 font-medium">
+                  {generatedMessage.subject}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-500">
+                  <span>СЪОБЩЕНИЕ</span>
+                  <button
+                    onClick={() => copyToClipboard(generatedMessage.body)}
+                    className="text-violet-600 hover:underline"
+                  >
+                    Копирай
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  value={generatedMessage.body}
+                  className="h-52 w-full resize-y rounded border bg-white p-3 text-sm leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t bg-slate-50 px-5 py-3 text-sm">
+              <button
+                onClick={closeAiModal}
+                className="rounded border border-slate-300 bg-white px-4 py-1.5 hover:bg-slate-100"
+              >
+                Затвори
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (generatedMessage) {
+                      // regenerate could be added later
+                      closeAiModal();
+                    }
+                  }}
+                  className="rounded border border-violet-300 px-4 py-1.5 text-violet-700 hover:bg-violet-100"
+                >
+                  Затвори
+                </button>
+                <button
+                  onClick={() => copyToClipboard(generatedMessage.subject + "\n\n" + generatedMessage.body)}
+                  className="rounded bg-violet-600 px-4 py-1.5 font-medium text-white hover:bg-violet-700"
+                >
+                  Копирай всичко
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

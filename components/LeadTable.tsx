@@ -15,9 +15,13 @@ const STATUSES: LeadStatus[] = ["new", "processed", "contacted", "replied", "cus
 export default function LeadTable({
   leads,
   onUpdated,
+  onGenerateMessage,
+  generatingId,
 }: {
   leads: Lead[];
   onUpdated?: () => void;
+  onGenerateMessage?: (lead: Lead) => void;
+  generatingId?: string | null;
 }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -59,6 +63,7 @@ export default function LeadTable({
             <th className="px-3 py-2">Рейтинг</th>
             <th className="px-3 py-2">Качество</th>
             <th className="px-3 py-2">Статус</th>
+            <th className="px-3 py-2">AI</th>
             <th className="px-3 py-2">Соц.</th>
           </tr>
         </thead>
@@ -112,6 +117,19 @@ export default function LeadTable({
                     ))}
                   </select>
                 </td>
+
+                {/* AI Generate Message */}
+                <td className="px-2 py-2">
+                  <button
+                    onClick={() => onGenerateMessage?.(l)}
+                    disabled={!onGenerateMessage || generatingId === l.id}
+                    title="Генерирай персонализирано съобщение с Grok"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-violet-300 text-lg leading-none text-violet-600 hover:bg-violet-100 disabled:opacity-40"
+                  >
+                    {generatingId === l.id ? "⏳" : "✨"}
+                  </button>
+                </td>
+
                 <td className="px-3 py-2 text-xs">
                   {socialCount > 0 ? (
                     <span title={`${socialCount} профила`}>🔗 {socialCount}</span>
