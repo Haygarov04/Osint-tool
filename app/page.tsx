@@ -388,6 +388,23 @@ export default function Home() {
     }
   }
 
+  async function deleteFolderUI(name: string) {
+    if (!confirm(`Изтрий папка "${name}"?\nЛийдовете остават в системата, само папката се премахва.`)) return;
+
+    await fetch("/api/folders", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    if (currentFolder === name) {
+      await switchFolder(null);
+    }
+    await loadFolders();
+    setMessage(`Папка "${name}" изтрита`);
+    setTimeout(() => setMessage(null), 2000);
+  }
+
   // Maltego-style Transforms - fully useful
   async function runTransform(type: string) {
     let msg = '';
@@ -595,9 +612,21 @@ export default function Home() {
                     onDragOver={(e) => handleDragOver(e, f)} 
                     onDragLeave={handleDragLeave} 
                     onDrop={(e) => handleFolderDrop(f, e)} 
-                    className={`w-full flex justify-between px-3 py-1.5 rounded-2xl ${currentFolder === f ? 'bg-violet-100' : 'hover:bg-slate-50'} ${dragOverFolder === f ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-2xl group ${currentFolder === f ? 'bg-violet-100' : 'hover:bg-slate-50'} ${dragOverFolder === f ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
                   >
-                    📁 {f} <span>{folderCounts[f] || 0}</span>
+                    <span className="flex items-center gap-1.5">
+                      📁 {f}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs">
+                      <span>{folderCounts[f] || 0}</span>
+                      <span
+                        onClick={(e) => { e.stopPropagation(); deleteFolderUI(f); }}
+                        className="ml-1 px-1 text-red-400 hover:text-red-600 opacity-60 group-hover:opacity-100 cursor-pointer select-none"
+                        title="Изтрий папка"
+                      >
+                        ×
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>
@@ -613,13 +642,7 @@ export default function Home() {
                 <div key={i} onClick={() => {/* color selection for new */}} className="w-5 h-5 rounded-full border cursor-pointer" style={{background:c}} />
               ))}
             </div>
-            <button onClick={() => {
-              if (!newFolderName.trim()) return;
-              const name = newFolderName.trim();
-              const color = '#3b82f6'; // or pick
-              fetch('/api/folders', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})})
-                .then(() => { setNewFolderName(''); loadFolders(); if(selectedLeadIds.length) moveSelectedToFolder(name); });
-            }} className="w-full bg-blue-600 text-white rounded-2xl py-2 text-sm font-medium">Create</button>
+            <button onClick={createNewFolder} className="w-full bg-blue-600 text-white rounded-2xl py-2 text-sm font-medium">Create</button>
           </div>
 
           {/* Maltego Transforms - useful OSINT actions */}

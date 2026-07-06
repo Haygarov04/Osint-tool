@@ -23,7 +23,7 @@ export async function xaiChat(
   }
 
   const {
-    model = "grok-2",
+    model = "grok-4.3",
     temperature = 0.7,
     maxTokens = 800,
     jsonMode = false,
