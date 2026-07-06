@@ -88,21 +88,6 @@ export default function Home() {
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<StatsResult | null>(null);
 
-  // Premium filtered leads (with search)
-  const filteredLeads = leads.filter(l => {
-    const matchesFolder = !currentFolder || (l as any).folder === currentFolder;
-    const matchesStatus = activeStatusFilter === 'all' || l.status === activeStatusFilter;
-    const matchesSource = selectedSource === 'all' || l.source === selectedSource;
-    const q = searchTerm.toLowerCase();
-    const matchesSearch = !q || 
-      l.name.toLowerCase().includes(q) || 
-      (l.phone||'').toLowerCase().includes(q) || 
-      (l.email||'').toLowerCase().includes(q) || 
-      (l.city||'').toLowerCase().includes(q) || 
-      (l.website||'').toLowerCase().includes(q) ||
-      (l.category||'').toLowerCase().includes(q);
-    return matchesFolder && matchesStatus && matchesSource && matchesSearch;
-  });
   const [busy, setBusy] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -138,6 +123,22 @@ export default function Home() {
   const [selectedSource, setSelectedSource] = useState<'all' | 'osm' | 'google'>('all');
   const [showGraph, setShowGraph] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Premium filtered leads (with search) - must be after all useState
+  const filteredLeads = leads.filter(l => {
+    const matchesFolder = !currentFolder || (l as any).folder === currentFolder;
+    const matchesStatus = activeStatusFilter === 'all' || l.status === activeStatusFilter;
+    const matchesSource = selectedSource === 'all' || l.source === selectedSource;
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = !q || 
+      (l.name||'').toLowerCase().includes(q) || 
+      (l.phone||'').toLowerCase().includes(q) || 
+      (l.email||'').toLowerCase().includes(q) || 
+      (l.city||'').toLowerCase().includes(q) || 
+      (l.website||'').toLowerCase().includes(q) ||
+      (l.category||'').toLowerCase().includes(q);
+    return matchesFolder && matchesStatus && matchesSource && matchesSearch;
+  });
 
   const FOLDER_PALETTE = ['#22c55e', '#3b82f6', '#eab308', '#ef4444', '#a855f7', '#14b8a6'];
 
@@ -183,14 +184,21 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Initial load only once
     loadLeads(EMPTY_FILTERS).catch(() => {});
     loadStats().catch(() => {});
     loadFolders().catch(() => {});
     
-    // Load folder colors
-    const savedColors = localStorage.getItem('folderColors');
-    if (savedColors) setFolderColors(JSON.parse(savedColors));
-  }, [loadLeads, loadStats, loadFolders]);
+    // Load folder colors - safe
+    if (typeof window !== 'undefined') {
+      try {
+        const savedColors = localStorage.getItem('folderColors');
+        if (savedColors) setFolderColors(JSON.parse(savedColors));
+      } catch (e) {
+        // ignore bad storage
+      }
+    }
+  }, []);  // run once
 
   async function collect(p: CollectParams) {
     setBusy(true);
