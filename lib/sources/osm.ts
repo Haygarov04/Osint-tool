@@ -116,6 +116,7 @@ function toLead(
     companySize: "",
     tags: [],
     status: "new",
+    aiInsights: "",
   };
 }
 

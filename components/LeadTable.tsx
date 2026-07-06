@@ -26,11 +26,13 @@ export default function LeadTable({
   onUpdated,
   onGenerateMessage,
   generatingId,
+  onSelectLead,
 }: {
   leads: Lead[];
   onUpdated?: () => void;
   onGenerateMessage?: (lead: Lead) => void;
   generatingId?: string | null;
+  onSelectLead?: (lead: Lead) => void;
 }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -80,8 +82,8 @@ export default function LeadTable({
           {leads.map((l) => {
             const socialCount = [l.facebook, l.instagram, l.linkedin, l.youtube, l.tiktok].filter(Boolean).length;
             return (
-              <tr key={l.id} className="hover:bg-slate-50">
-                <td className="px-3 py-2 font-medium max-w-[220px] truncate" title={l.name}>{l.name}</td>
+              <tr key={l.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onSelectLead?.(l)}>
+                <td className="px-3 py-2 font-medium max-w-[220px] truncate text-blue-700 hover:underline" title={l.name}>{l.name}</td>
                 <td className="px-3 py-2 text-slate-500">{l.category}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{l.phone || "—"}</td>
                 <td className="px-3 py-2 text-xs max-w-[180px] truncate">
@@ -118,7 +120,7 @@ export default function LeadTable({
                   <select
                     value={l.status}
                     disabled={updatingId === l.id}
-                    onChange={(e) => updateStatus(l.id, e.target.value as LeadStatus)}
+                    onChange={(e) => { e.stopPropagation(); updateStatus(l.id, e.target.value as LeadStatus); }}
                     className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs disabled:opacity-50"
                   >
                     {STATUSES.map((s) => (
@@ -130,7 +132,7 @@ export default function LeadTable({
                 {/* AI Generate Message */}
                 <td className="px-2 py-2">
                   <button
-                    onClick={() => onGenerateMessage?.(l)}
+                    onClick={(e) => { e.stopPropagation(); onGenerateMessage?.(l); }}
                     disabled={!onGenerateMessage || generatingId === l.id}
                     title="Генерирай персонализирано съобщение с Grok"
                     className="flex h-7 w-7 items-center justify-center rounded-full border border-violet-300 text-lg leading-none text-violet-600 hover:bg-violet-100 disabled:opacity-40"

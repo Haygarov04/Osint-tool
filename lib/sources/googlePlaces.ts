@@ -111,6 +111,7 @@ export const googlePlacesSource: Source = {
           companySize: "",
           tags: [],
           status: "new",
+          aiInsights: "",
         };
       })
     );

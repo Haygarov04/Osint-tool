@@ -148,6 +148,7 @@ function newLeadRecord(item: NewLead, domain: string): Lead {
     youtube: "",
     tiktok: "",
     notes: "",
+    aiInsights: "",
     qualityScore: 0,
     enrichedAt: null,
     createdAt: now,
@@ -195,10 +196,10 @@ export async function saveEnriched(
   return merged;
 }
 
-// Обновява CRM полета на един лийд (статус/бележки/тагове) и преиндексира статуса.
+// Обновява CRM полета на един лийд (статус/бележки/тагове/aiInsights) и преиндексира статуса.
 export async function updateLeadFields(
   id: string,
-  patch: Partial<Pick<Lead, "status" | "notes" | "tags">>
+  patch: Partial<Pick<Lead, "status" | "notes" | "tags" | "aiInsights">>
 ): Promise<Lead | null> {
   const redis = getRedis();
   const old = await redis.get<Lead>(leadKey(id));

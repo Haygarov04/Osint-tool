@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import SearchForm, { CollectParams } from "@/components/SearchForm";
 import LeadTable from "@/components/LeadTable";
 import StatsBar from "@/components/StatsBar";
+import LeadModal from "@/components/LeadModal";
 import { INDUSTRIES } from "@/lib/industries";
 import type { Lead, StatsResult } from "@/lib/types";
 
@@ -102,6 +103,9 @@ export default function Home() {
     subject: string;
     body: string;
   } | null>(null);
+
+  // CRM Modal
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [k]: v }));
@@ -550,9 +554,10 @@ export default function Home() {
         onUpdated={() => loadLeads(filters)}
         onGenerateMessage={generateAiMessage}
         generatingId={aiGeneratingFor}
+        onSelectLead={setSelectedLead}
       />
 
-      {/* AI Message Modal */}
+      {/* AI Message Modal (global quick one) */}
       {generatedMessage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
@@ -561,77 +566,46 @@ export default function Home() {
                 <div className="font-semibold">✨ Персонализирано съобщение</div>
                 <div className="text-sm text-slate-500">{generatedMessage.leadName}</div>
               </div>
-              <button
-                onClick={closeAiModal}
-                className="text-2xl leading-none text-slate-400 hover:text-slate-600"
-              >
-                ×
-              </button>
+              <button onClick={closeAiModal} className="text-2xl leading-none text-slate-400 hover:text-slate-600">×</button>
             </div>
 
             <div className="space-y-4 p-5">
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-500">
                   <span>SUBJECT</span>
-                  <button
-                    onClick={() => copyToClipboard(generatedMessage.subject)}
-                    className="text-violet-600 hover:underline"
-                  >
-                    Копирай
-                  </button>
+                  <button onClick={() => copyToClipboard(generatedMessage.subject)} className="text-violet-600 hover:underline">Копирай</button>
                 </div>
-                <div className="rounded border bg-slate-50 px-3 py-2 font-medium">
-                  {generatedMessage.subject}
-                </div>
+                <div className="rounded border bg-slate-50 px-3 py-2 font-medium">{generatedMessage.subject}</div>
               </div>
-
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-500">
                   <span>СЪОБЩЕНИЕ</span>
-                  <button
-                    onClick={() => copyToClipboard(generatedMessage.body)}
-                    className="text-violet-600 hover:underline"
-                  >
-                    Копирай
-                  </button>
+                  <button onClick={() => copyToClipboard(generatedMessage.body)} className="text-violet-600 hover:underline">Копирай</button>
                 </div>
-                <textarea
-                  readOnly
-                  value={generatedMessage.body}
-                  className="h-52 w-full resize-y rounded border bg-white p-3 text-sm leading-relaxed"
-                />
+                <textarea readOnly value={generatedMessage.body} className="h-52 w-full resize-y rounded border bg-white p-3 text-sm leading-relaxed" />
               </div>
             </div>
 
             <div className="flex items-center justify-between border-t bg-slate-50 px-5 py-3 text-sm">
-              <button
-                onClick={closeAiModal}
-                className="rounded border border-slate-300 bg-white px-4 py-1.5 hover:bg-slate-100"
-              >
-                Затвори
-              </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    if (generatedMessage) {
-                      // regenerate could be added later
-                      closeAiModal();
-                    }
-                  }}
-                  className="rounded border border-violet-300 px-4 py-1.5 text-violet-700 hover:bg-violet-100"
-                >
-                  Затвори
-                </button>
-                <button
-                  onClick={() => copyToClipboard(generatedMessage.subject + "\n\n" + generatedMessage.body)}
-                  className="rounded bg-violet-600 px-4 py-1.5 font-medium text-white hover:bg-violet-700"
-                >
-                  Копирай всичко
-                </button>
-              </div>
+              <button onClick={closeAiModal} className="rounded border border-slate-300 bg-white px-4 py-1.5 hover:bg-slate-100">Затвори</button>
+              <button onClick={() => copyToClipboard(generatedMessage.subject + "\n\n" + generatedMessage.body)} className="rounded bg-violet-600 px-4 py-1.5 font-medium text-white hover:bg-violet-700">Копирай всичко</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Full CRM Lead Modal */}
+      {selectedLead && (
+        <LeadModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onUpdated={(updated) => {
+            // обновяваме локалния списък
+            setLeads(prev => prev.map(l => l.id === updated.id ? updated : l));
+            setSelectedLead(updated);
+          }}
+          aiOffer={aiOffer}
+        />
       )}
     </main>
   );

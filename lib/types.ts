@@ -60,6 +60,9 @@ export interface Lead {
   status: LeadStatus;
   notes: string; // CRM бележки
 
+  // AI (xAI) кеширани анализи — за да не харчим кредити всеки път
+  aiInsights?: string; // Grok анализ: защо е добър лийд, pitch ъгли и т.н. (кеширан)
+
   enrichedAt: number | null; // кога е правен опит за обогатяване (имейл/соц.)
   createdAt: number; // unix ms
   updatedAt: number; // unix ms
