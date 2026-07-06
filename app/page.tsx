@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import SearchForm, { CollectParams } from "@/components/SearchForm";
+import LeadGraph from "@/components/LeadGraph";
 import LeadTable from "@/components/LeadTable";
 import StatsBar from "@/components/StatsBar";
 import LeadModal from "@/components/LeadModal";
@@ -211,9 +212,19 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(p),
       });
-      const data = await res.json();
+
+      // Robust JSON parsing — external errors or Vercel timeouts often return HTML/text
+      let data: any = {};
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: text.slice(0, 300) || `HTTP ${res.status}` };
+      }
+
       if (!res.ok) {
-        setError(data.error ?? "Грешка при събиране.");
+        setError(data.error ?? `Грешка при събиране (HTTP ${res.status}).`);
       } else {
         setMessage(
           `Претърсени ${data.combos} комбинации. Намерени ${data.collected}: ${data.added} нови, ${data.updated} обновени. Общо в базата: ${data.total}.`
@@ -821,27 +832,29 @@ export default function Home() {
         />
       )}
 
-      {/* Maltego Graph Modal - basic relationship view */}
+      {/* Real interactive Graph Modal */}
       {showGraph && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowGraph(false)}>
-          <div className="bg-white rounded-3xl p-6 w-[90%] max-w-3xl max-h-[80vh] overflow-auto" onClick={e=>e.stopPropagation()}>
-            <div className="flex justify-between mb-4">
-              <div className="font-semibold text-xl">Maltego-style Graph</div>
-              <button onClick={() => setShowGraph(false)} className="text-2xl">×</button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4" onClick={() => setShowGraph(false)}>
+          <div className="bg-white rounded-3xl p-5 w-full max-w-[880px]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="font-semibold text-xl">Граф на връзките (Maltego-style)</div>
+                <div className="text-xs text-slate-500">Възли = лийдове • Линии = общи градове / домейни / индустрии</div>
+              </div>
+              <button onClick={() => setShowGraph(false)} className="text-3xl leading-none text-slate-400 hover:text-black">×</button>
             </div>
-            <div className="text-sm text-slate-600 mb-4">Relationships between current leads (shared city, tech, or source). In full Maltego this would be interactive nodes.</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              {leads.slice(0, 12).map(lead => (
-                <div key={lead.id} className="border rounded-2xl p-3">
-                  <div className="font-medium">{lead.name}</div>
-                  <div className="text-xs text-slate-500">City: {lead.city || '—'} • Tech: {lead.techStack?.[0] || '—'}</div>
-                  <div className="mt-2 text-xs">
-                    Related: {leads.filter(l => l.id !== lead.id && (l.city === lead.city || l.techStack?.some(t => lead.techStack?.includes(t)))).slice(0,3).map(r => r.name).join(', ') || 'None in current set'}
-                  </div>
-                </div>
-              ))}
+
+            <LeadGraph
+              leads={filteredLeads.length > 0 ? filteredLeads : leads}
+              onNodeClick={(lead) => {
+                setShowGraph(false);
+                setSelectedLead(lead);
+              }}
+            />
+
+            <div className="mt-3 text-[11px] text-slate-400">
+              Съвет: Филтрирай в главния екран (търсене, статус, папка) → отвори Graph за по-чист изглед.
             </div>
-            <div className="mt-4 text-xs text-slate-400">Tip: Use Transforms in sidebar to expand relationships. Grok can also analyze connections in the lead modal.</div>
           </div>
         </div>
       )}

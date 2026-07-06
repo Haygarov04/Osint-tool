@@ -6,7 +6,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const MAX_COMBOS = 30; // таван на комбинациите (локация × индустрия) за едно извикване
+const MAX_COMBOS = 25; // таван на комбинациите (локация × индустрия) за едно извикване
+const CONCURRENCY = 4;   // колко заявки към OSM/Overpass паралелно (публичният Overpass не обича повече)
 
 // POST /api/collect  { source, location, industries[] (или industry), limit }
 export async function POST(req: NextRequest) {
@@ -68,7 +69,26 @@ export async function POST(req: NextRequest) {
     const touchedIds: string[] = [];
     const errors: string[] = [];
 
-    for (const c of combos) {
+    // Limited concurrency to avoid killing public Overpass / rate limits
+    async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
+      const queue = [...items];
+      const workers: Promise<void>[] = [];
+      const active = new Set<Promise<void>>();
+
+      while (queue.length > 0 || active.size > 0) {
+        while (active.size < limit && queue.length > 0) {
+          const item = queue.shift()!;
+          const p = worker(item).finally(() => active.delete(p));
+          active.add(p);
+          workers.push(p);
+        }
+        if (active.size > 0) {
+          await Promise.race(active);
+        }
+      }
+    }
+
+    await runWithConcurrency(combos, CONCURRENCY, async (c) => {
       try {
         const found = await src.search({
           location: c.location,
@@ -79,7 +99,7 @@ export async function POST(req: NextRequest) {
         collected += found.length;
         added += r.added;
         updated += r.updated;
-        total = r.total;
+        total = Math.max(total, r.total || 0);
         if (r.ids) touchedIds.push(...r.ids);
       } catch (e) {
         errors.push(
@@ -88,7 +108,7 @@ export async function POST(req: NextRequest) {
           }`
         );
       }
-    }
+    });
 
     // Автоматично запазване в "Inbox" при събиране
     if (touchedIds.length > 0) {
