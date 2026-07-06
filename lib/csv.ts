@@ -29,6 +29,7 @@ const COLUMNS: (keyof Lead)[] = [
   "qualityScore",
   "tags",
   "status",
+  "enrichedAt",
   "createdAt",
   "updatedAt",
 ];

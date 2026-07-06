@@ -141,11 +141,50 @@ function newLeadRecord(item: NewLead, domain: string): Lead {
     id: randomUUID(),
     domain,
     qualityScore: 0,
+    enrichedAt: null,
     createdAt: now,
     updatedAt: now,
   };
   lead.qualityScore = computeQualityScore(lead);
   return lead;
+}
+
+// Лийдове, които имат сайт, но нямат имейл и още не са обогатявани.
+export async function leadsToEnrich(
+  limit: number
+): Promise<{ batch: Lead[]; remaining: number }> {
+  const redis = getRedis();
+  const ids = await redis.sinter("idx:has_website:1", "idx:has_email:0");
+  if (ids.length === 0) return { batch: [], remaining: 0 };
+  const leads = await mgetLeads(ids);
+  const pending = leads.filter((l) => !l.enrichedAt);
+  return { batch: pending.slice(0, limit), remaining: pending.length };
+}
+
+// Записва обогатен лийд: маха стария от индексите, слива patch-а, преиндексира.
+export async function saveEnriched(
+  old: Lead,
+  patch: Partial<Lead>
+): Promise<Lead> {
+  const redis = getRedis();
+  const rp = redis.pipeline();
+  for (const k of leadIndexKeys(old)) rp.srem(k, old.id);
+  await rp.exec();
+
+  const merged: Lead = {
+    ...old,
+    ...patch,
+    enrichedAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  merged.qualityScore = computeQualityScore(merged);
+
+  const p = redis.pipeline();
+  p.set(leadKey(merged.id), merged);
+  p.sadd(ALL, merged.id);
+  for (const k of leadIndexKeys(merged)) p.sadd(k, merged.id);
+  await p.exec();
+  return merged;
 }
 
 // Кои равенствени индекси да пресечем спрямо филтъра.
@@ -230,11 +269,14 @@ export async function getStats(): Promise<StatsResult> {
     byStatus[s] = await redis.scard(`idx:status:${s}`);
   }
 
+  const enrichIds = await redis.sinter("idx:has_website:1", "idx:has_email:0");
+
   return {
     total,
     bySource,
     byStatus,
     withoutWebsite: await redis.scard("idx:has_website:0"),
     withEmail: await redis.scard("idx:has_email:1"),
+    enrichable: enrichIds.length,
   };
 }

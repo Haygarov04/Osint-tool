@@ -39,7 +39,23 @@ export default function LeadTable({ leads }: { leads: Lead[] }) {
               <td className="px-3 py-2 font-medium">{l.name}</td>
               <td className="px-3 py-2 text-slate-500">{l.category}</td>
               <td className="px-3 py-2">{l.phone || "—"}</td>
-              <td className="px-3 py-2">{l.email || "—"}</td>
+              <td className="px-3 py-2">
+                {l.email ? (
+                  <span>
+                    {l.email}
+                    {l.emailVerified === "valid" && (
+                      <span
+                        className="ml-1 text-green-600"
+                        title="Домейнът приема поща (MX)"
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </td>
               <td className="px-3 py-2">
                 {l.website ? (
                   <a

@@ -14,6 +14,36 @@ interface FetchOpts {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Сваля суров текст/HTML (за скролване на сайтове). Кратък таймаут, 1 повторение.
+export async function fetchText(
+  url: string,
+  { timeoutMs = 10000, retries = 1 }: { timeoutMs?: number; retries?: number } = {}
+): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": config.userAgent,
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "follow",
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.text();
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt < retries) await sleep(500);
+    }
+  }
+  throw new Error(`fetchText ${url}: ${String(lastErr)}`);
+}
+
 function cacheKey(url: string, body?: string): string {
   // Проста детерминирана дължина — достатъчна за ключ.
   const raw = url + (body ?? "");

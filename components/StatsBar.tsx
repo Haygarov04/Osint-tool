@@ -12,10 +12,11 @@ function Stat({ label, value }: { label: string; value: number }) {
 export default function StatsBar({ stats }: { stats: StatsResult | null }) {
   if (!stats) return null;
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
       <Stat label="Общо лийдове" value={stats.total} />
       <Stat label="Без сайт" value={stats.withoutWebsite} />
       <Stat label="С имейл" value={stats.withEmail} />
+      <Stat label="За обогатяване" value={stats.enrichable} />
       <Stat label="OSM" value={stats.bySource.osm ?? 0} />
       <Stat label="Google" value={stats.bySource.google ?? 0} />
     </div>

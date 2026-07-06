@@ -50,6 +50,7 @@ export interface Lead {
   tags: string[];
   status: LeadStatus;
 
+  enrichedAt: number | null; // кога е правен опит за обогатяване (имейл/соц.)
   createdAt: number; // unix ms
   updatedAt: number; // unix ms
 }
@@ -57,7 +58,12 @@ export interface Lead {
 // Стойност за нов лийд преди дедуп/съхранение (без id/времена/score).
 export type NewLead = Omit<
   Lead,
-  "id" | "qualityScore" | "createdAt" | "updatedAt" | "domain"
+  | "id"
+  | "qualityScore"
+  | "createdAt"
+  | "updatedAt"
+  | "domain"
+  | "enrichedAt"
 > & { domain?: string };
 
 // Комбинируеми филтри (секция 5 от спецификацията).
@@ -104,4 +110,5 @@ export interface StatsResult {
   byStatus: Record<string, number>;
   withoutWebsite: number;
   withEmail: number;
+  enrichable: number; // има сайт, няма имейл (кандидати за обогатяване)
 }
